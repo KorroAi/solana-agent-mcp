@@ -9,10 +9,8 @@
 </p>
 
 <p align="center">
-  <a href="./demo.mp4">
-    <img src="poster.png" alt="Solana Agent MCP Demo" width="720">
-  </a>
-  <br><sub>Click to watch demo (45s, 1080p)</sub>
+  <img src="demo.gif" alt="Solana Agent MCP Demo" width="720">
+  <br><sub><a href="./demo.mp4">Watch in HD (1080p, 45s)</a></sub>
 </p>
 
 <p align="center">
