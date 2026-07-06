@@ -1,18 +1,55 @@
 # Solana Agent MCP
 
-HTTP REST API server for real-time Solana pump.fun token scanning, momentum analysis, and automated paper trading. Designed as an MCP (Model Context Protocol) tool that gives AI agents full visibility into the Solana memecoin ecosystem.
+Real-time Solana pump.fun token scanner with MCP stdio transport + HTTP REST API. AI agents connect natively via stdin/stdout — **no API key needed**.
 
 ## Architecture
 
 ```
-WebSocket (Helius) → Scanner → Momentum Filter → Signal Engine → Auto-Trader
-                                        ↓
-                                 HTTP API (:8791) → Dashboard / AI Agents
-                                        ↓
-                                 SSE Stream → Real-time UI
+Agent (Claude Desktop / Cursor) → stdio (MCP) ─┐
+                                                  ├→ Scanner → Momentum → Signals → Auto-Trader
+Browser Dashboard → HTTP :8791 ──────────────────┘
+                    SSE Stream → Real-time UI
 ```
 
-The server watches pump.fun program logs via Helius WebSocket, tracks bonding curve activity in real-time, applies momentum-based filters to identify promising tokens, and executes paper trades with configurable TP/SL/Trailing stop.
+**Dual transport**: MCP stdio for AI agents (no auth, local process) + HTTP on `:8791` for browser dashboards.
+
+## AI Agent Connection (MCP stdio)
+
+Agents connect via the standard MCP protocol over stdin/stdout. **No API key, no network, no auth** — the agent spawns the server as a child process.
+
+### Claude Desktop config
+
+```json
+{
+  "mcpServers": {
+    "solana-agent": {
+      "command": "npx",
+      "args": ["tsx", "C:/Users/kevin/Desktop/free-claude-code/solana-agent-mcp/src/index.ts"]
+    }
+  }
+}
+```
+
+### Available MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `solana_scan` | Recent pump.fun tokens from real-time scanner |
+| `solana_health` | System health: scanner, positions, PnL, RPC |
+| `solana_portfolio` | Active positions with live PnL |
+| `solana_trades` | Trade history with PnL breakdown |
+| `solana_stats` | Win rate, best/worst trades, daily PnL |
+| `solana_autotrade_start` | Start automated paper trading |
+| `solana_autotrade_stop` | Stop automated paper trading |
+| `solana_settings` | Current trading config and parameters |
+
+### Available MCP Resources
+
+| Resource URI | Content |
+|-------------|---------|
+| `solana://health` | System health snapshot |
+| `solana://tokens/recent` | Last 20 tokens detected by scanner |
+| `solana://portfolio/active` | Active positions with live prices |
 
 ## Quick Start
 
