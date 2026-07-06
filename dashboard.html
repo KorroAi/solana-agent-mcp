@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solana Sniper — Pre-Dex Terminal</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+<style>
+:root{--bg:#090b10;--bg2:#0d1117;--bg3:#111820;--border:#1a2332;--ba:#273449;--txt:#e6edf3;--dim:#6e7681;--d2:#444c56;--grn:#3fb950;--red:#f85149;--yel:#d29922;--blu:#58a6ff;--prp:#a371f7;--grad:linear-gradient(135deg,#a371f7 0%,#58a6ff 50%,#3fb950 100%)}
+*{margin:0;padding:0;box-sizing:border-box}
+::selection{background:var(--prp);color:#fff}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+body{background:var(--bg);color:var(--txt);font:13px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
+.top{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{font-weight:800;font-size:15px;letter-spacing:-0.3px}
+.logo span{background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.badge{font-size:9px;font-weight:700;padding:3px 10px;border-radius:12px;letter-spacing:.5px;text-transform:uppercase}
+.b-live{background:#a371f718;color:var(--prp);border:1px solid #a371f730}
+.b-paper{background:#d2992218;color:var(--yel);border:1px solid #d2992230}
+.b-on{background:#3fb95018;color:var(--grn);border:1px solid #3fb95030}
+.b-off{background:#f8514918;color:var(--red);border:1px solid #f8514930}
+.conn{width:8px;height:8px;border-radius:50%;display:inline-block}
+.conn.on{background:var(--grn);box-shadow:0 0 8px #3fb95060}
+.conn.off{background:var(--red);box-shadow:0 0 8px #f8514960}
+.btn{padding:5px 14px;border-radius:4px;font:600 10px inherit;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--dim);transition:all .15s;letter-spacing:.3px}
+.btn:hover{color:var(--txt);border-color:var(--ba)}
+.btn.p{color:var(--prp);border-color:var(--prp);background:#a371f712}
+.btn.p:hover{background:#a371f722}
+.btn.g{color:var(--grn);border-color:var(--grn);background:#3fb95012}
+.btn.g:hover{background:#3fb95022}
+.btn.r{color:var(--red);border-color:var(--red);background:#f8514912}
+.btn.r:hover{background:#f8514922}
+.btn.lk{color:var(--blu);border-color:transparent;background:transparent}
+.main{padding:14px 20px;max-width:1600px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.stats{display:grid;grid-template-columns:repeat(9,1fr);gap:8px}
+.st{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:14px 16px;transition:border-color .3s}
+.st:hover{border-color:var(--ba)}
+.st .v{font:700 16px 'SF Mono',Consolas,monospace}
+.st .l{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;margin-top:2px}
+.st .s{font-size:9px;color:var(--d2);margin-top:1px}
+.g{color:var(--grn)}.r{color:var(--red)}.y{color:var(--yel)}.b{color:var(--blu)}.p{color:var(--prp)}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 0}
+.bar-sep{width:1px;height:16px;background:var(--border)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.panel-h{padding:9px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--bg3)}
+.panel-h h2{font:600 9px inherit;color:var(--dim);text-transform:uppercase;letter-spacing:.8px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--grn);animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+.live-dot.dead{background:var(--red);animation:none}
+.count{font-size:9px;color:var(--d2)}
+table{width:100%;border-collapse:collapse}
+th{padding:7px 10px;font:600 8px inherit;color:var(--dim);text-transform:uppercase;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap;letter-spacing:.5px;background:var(--bg2)}
+th.l{text-align:left}
+td{padding:7px 10px;font-size:11px;border-bottom:1px solid #ffffff04;text-align:right;white-space:nowrap}
+td.l{text-align:left;font:10px 'SF Mono',Consolas,monospace}
+td.mono{font:10px 'SF Mono',Consolas,monospace}
+tr:hover td{background:rgba(255,255,255,0.02)}
+.pnl-up{color:var(--grn);font-weight:600}
+.pnl-down{color:var(--red);font-weight:600}
+.scroll{max-height:340px;overflow-y:auto}
+.scroll.sm{max-height:240px}
+.tag{display:inline-block;padding:1px 7px;border-radius:6px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.tag-w{background:#3fb95014;color:var(--grn)}.tag-l{background:#f8514914;color:var(--red)}
+.tag-pf{background:#a371f714;color:var(--prp)}.tag-boost{background:#58a6ff14;color:var(--blu)}
+.tag-dex{background:#d2992214;color:var(--yel)}
+.empty td{text-align:center!important;color:var(--d2);padding:32px 10px;font-size:11px}
+.footer{text-align:center;padding:14px;color:var(--dim);font-size:9px;border-top:1px solid var(--border);letter-spacing:.3px}
+.chart-wrap{height:120px;padding:8px 0;position:relative}
+.chart-wrap canvas{width:100%;height:100%}
+.chart-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--d2);font-size:11px;pointer-events:none}
+@media(max-width:1000px){.stats{grid-template-columns:repeat(3,1fr)}.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="top">
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="logo">⚡ Solana<span>Sniper</span></div>
+    <span id="mode-badge"></span>
+    <span id="auto-badge"></span>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px;font-size:12px">
+    <span id="bal" style="font-weight:700;font-size:13px"></span>
+    <span id="scanner-msg" style="font-size:9px;color:var(--dim)"></span>
+    <span class="conn on" id="conn" title="Scanner"></span>
+    <button class="btn p" id="paper-btn" onclick="togglePaper()">PAPER</button>
+    <button class="btn r" id="auto-btn" onclick="toggleAuto()">STOP</button>
+    <a href="/farm/dashboard" class="btn lk">Farm →</a>
+  </div>
+</div>
+<div class="main" id="main"></div>
+<div class="footer">Solana Sniper V10 — Momentum Strategy — ≥10 buys &gt;$10/60s · Sells &lt;2x buys · TP 100% · SL 20% · Trail 15%</div>
+<script>
+const A='http://127.0.0.1:8791';
+function Q(id){return document.getElementById(id)}
+const F={
+ sol:function(v){return(+v||0).toFixed(3)},
+ sol4:function(v){return(+v||0).toFixed(4)},
+ pct:function(v){let p=+v||0;return(p>=0?'+':'')+p.toFixed(1)+'%'},
+ usd:function(v){let n=+v||0;return n<0.0001?'$'+n.toExponential(2):'$'+n.toFixed(6)},
+ usd8:function(v){return'$'+(+v||0).toFixed(8)},
+ age:function(s){if(s>=3600)return(s/3600).toFixed(1)+'h';return s>=60?(s/60).toFixed(1)+'m':Math.floor(s)+'s'},
+ big:function(n){return Number(n||0).toLocaleString('en-US',{maximumFractionDigits:0})},
+ mint:function(m){return'<a href="https://pump.fun/coin/'+m+'" target="_blank" rel="noopener" style="color:#58a6ff;text-decoration:none;font:10px monospace">'+m.slice(0,5)+'..'+m.slice(-4)+'</a>'},
+ pnlCls:function(v){return(+v||0)>=0?'pnl-up':'pnl-down'},
+ tag:function(c,t){return'<span class="tag tag-'+c+'">'+t+'</span>'}
+};
+async function api(path,method,body){
+  let opts={method:method||'GET'};
+  if(body){opts.headers={'Content-Type':'application/json'};opts.body=JSON.stringify(body)}
+  try{let r=await fetch(A+path,opts);return r.json()}catch(e){return null}
+}
+const SMOOTH=0.35;let state={};
+function lerp(a,b,f){return a+(b-a)*f}
+
+async function pollLive(){
+  let data=await api('/positions-live');
+  if(!data||!Array.isArray(data)){return;} // stale data — keep last render
+  let html='',count=0;
+  for(let p of data){
+    let k=p.mint;
+    if(!state[k])state[k]={dp:p.pnlSol,dpct:p.pnlPct,dval:p.currentValueSol};
+    let s=state[k];
+    s.dp=lerp(s.dp,p.pnlSol,SMOOTH);
+    s.dpct=lerp(s.dpct,p.pnlPct,SMOOTH);
+    s.dval=lerp(s.dval,p.currentValueSol,SMOOTH);
+    let cls=F.pnlCls(s.dp);
+    html+='<tr><td class="l">'+F.mint(k)+'</td>'+
+      '<td class="mono" style="color:var(--dim)">'+F.usd(p.entryUsd)+'</td>'+
+      '<td class="mono" style="color:var(--dim)">'+F.usd(p.priceUsd||0)+'</td>'+
+      '<td class="mono '+cls+'">'+F.sol4(s.dp)+'</td>'+
+      '<td class="'+cls+'">'+F.pct(s.dpct)+'</td>'+
+      '<td class="mono" style="color:var(--dim)">'+F.sol(s.dval)+'</td>'+
+      '<td style="color:var(--dim);font-size:10px">'+F.age(p.holdSec)+'</td></tr>';
+    count++;
+  }
+  let mints=new Set(data.map(p=>p.mint));
+  for(let k of Object.keys(state)){if(!mints.has(k))delete state[k]}
+  Q('live-tb').innerHTML=html||'<tr class="empty"><td colspan="7">No open positions</td></tr>';
+  Q('live-count').textContent=count;
+}
+
+async function refresh(){
+  try{
+    let[h,pos,trades,scan,scores,pf]=await Promise.all([
+      api('/health'),api('/positions'),api('/trades?limit=30'),
+      api('/scan?limit=20'),api('/scores'),api('/portfolio')
+    ]);
+    if(!h)return;
+    Q('conn').className='conn '+(h.scannerAlive?'on':'off');
+    Q('scanner-msg').textContent=h.scannerAlive?('scanner live · '+F.big(h.scannerMsgs)+' msgs'):'scanner reconnecting';
+    Q('mode-badge').innerHTML=h.paper?'<span class="badge b-paper">PAPER</span>':'<span class="badge b-live">LIVE</span>';
+    Q('auto-badge').innerHTML=h.autoTrade?'<span class="badge b-on">SNIPER ON</span>':'<span class="badge b-off">SNIPER OFF</span>';
+    Q('paper-btn').textContent=h.paper?'PAPER':'LIVE';
+    Q('paper-btn').className=h.paper?'btn p':'btn g';
+    Q('auto-btn').textContent=h.autoTrade?'STOP':'START';
+    Q('auto-btn').className=h.autoTrade?'btn r':'btn g';
+    renderStats(pf,h);
+    renderPositions(Array.isArray(pos)?pos:[]);
+    renderSignals(Array.isArray(scores)?scores:[]);
+    renderHistory(trades);
+    renderScanner(Array.isArray(scan)?scan:[]);
+    if(trades&&trades.trades)updateChart(trades.trades.slice(0,20));
+  }catch(e){}
+}
+function renderStats(pf,h){
+  if(!pf)return;
+  let wr=pf.tradeStats&&pf.tradeStats.winRate||'0';
+  let wrCls=parseFloat(wr)>=50?'g':'r';
+  Q('stats').innerHTML=[
+    {v:F.sol(pf.solBalance||0),l:'SOL BALANCE',c:'b',s:'$'+(pf.solUsd||0).toFixed(0)},
+    {v:wr+'%',l:'WIN RATE',c:wrCls,s:(pf.tradeStats&&pf.tradeStats.wins||0)+'W / '+(pf.tradeStats&&pf.tradeStats.losses||0)+'L'},
+    {v:F.sol(pf.tradeStats&&pf.tradeStats.bestPnl||0),l:'BEST PNL',c:'g'},
+    {v:F.sol(pf.tradeStats&&pf.tradeStats.worstPnl||0),l:'WORST PNL',c:'r'},
+    {v:pf.tradeStats&&pf.tradeStats.totalTrades||0,l:'TOTAL TRADES',c:'',s:(pf.activePositions||[]).length+' open'},
+    {v:h.autoTradeCount||0,l:'SNIPER TRADES',c:'y'},
+    {v:F.sol(pf.feesPaid||0),l:'FEES',c:'r'},
+    {v:F.sol(pf.dailyPnl||0),l:'DAILY PNL',c:pf.dailyPnl>=0?'g':'r'},
+    {v:pf.cbLosses||0,l:'CB LOSSES',c:pf.cbLosses>=3?'r':'y'}
+  ].map(function(c){
+    return'<div class="st"><div class="v '+c.c+'">'+c.v+'</div><div class="l">'+c.l+'</div>'+(c.s?'<div class="s">'+c.s+'</div>':'')+'</div>';
+  }).join('');
+}
+function renderPositions(list){
+  Q('pos-count').textContent=list.length;
+  if(!list.length){Q('pos-tb').innerHTML='<tr class="empty"><td colspan="7">No open positions</td></tr>';return}
+  Q('pos-tb').innerHTML=list.map(function(p){
+    let cls=F.pnlCls(p.pnlSol);
+    return'<tr><td class="l">'+F.mint(p.mint)+'</td>'+
+      '<td class="mono" style="color:var(--dim)">'+F.usd(p.entryUsd)+'</td>'+
+      '<td class="mono" style="color:var(--dim)">'+F.big(p.tokenAmount)+'</td>'+
+      '<td class="mono '+cls+'">'+F.sol4(p.pnlSol)+'</td>'+
+      '<td class="'+cls+'">'+F.pct(p.pnlPct)+'</td>'+
+      '<td class="mono" style="color:var(--dim)">'+F.sol(p.currentValueSol)+'</td>'+
+      '<td style="color:var(--dim);font-size:10px">'+F.age(p.holdSec)+'</td></tr>';
+  }).join('');
+}
+function renderSignals(list){
+  Q('sig-count').textContent=list.length;
+  if(!list.length){Q('sig-tb').innerHTML='<tr class="empty"><td colspan="4">Waiting for scanner...</td></tr>';return}
+  Q('sig-tb').innerHTML=list.slice(0,20).map(function(s){
+    let cls=s.action==='BUY'?'g':s.action==='WAIT'?'y':'r';
+    return'<tr><td class="l">'+F.mint(s.mint)+'</td>'+
+      '<td class="mono" style="color:var(--dim)">'+s.score+'</td>'+
+      '<td class="'+cls+'" style="font-weight:600;font-size:10px">'+s.action+'</td>'+
+      '<td style="color:var(--dim);font-size:9px;max-width:250px;overflow:hidden;text-overflow:ellipsis">'+(s.reasons||[]).join(', ')+'</td></tr>';
+  }).join('');
+}
+function renderHistory(d){
+  let trades=d&&d.trades||[];
+  Q('hist-count').textContent=trades.length;
+  if(!trades.length){Q('hist-tb').innerHTML='<tr class="empty"><td colspan="8">No completed trades</td></tr>';return}
+  Q('hist-tb').innerHTML=trades.slice(0,20).map(function(t){
+    let cls=F.pnlCls(t.pnlSol),tag=cls==='pnl-up'?F.tag('w','W'):F.tag('l','L');
+    return'<tr><td class="l" style="color:var(--dim);font-size:10px">#'+t.id+'</td>'+
+      '<td class="l">'+F.mint(t.mint)+'</td>'+
+      '<td class="mono '+cls+'">'+F.sol4(t.pnlSol)+'</td>'+
+      '<td class="'+cls+'">'+F.pct(t.pnlPct)+'</td>'+
+      '<td class="mono" style="color:var(--dim)">'+F.usd8(t.entryPriceUsd)+'</td>'+
+      '<td class="mono" style="color:var(--dim)">'+(t.exitPriceUsd?F.usd8(t.exitPriceUsd):'—')+'</td>'+
+      '<td style="color:var(--dim);font-size:10px">'+F.age(t.holdSec)+'</td>'+
+      '<td>'+tag+'</td></tr>';
+  }).join('');
+}
+function renderScanner(list){
+  Q('scan-count').textContent=list.length;
+  if(!list.length){Q('scan-tb').innerHTML='<tr class="empty"><td colspan="3">Monitoring pump.fun...</td></tr>';return}
+  Q('scan-tb').innerHTML=list.map(function(t){
+    let age=(Date.now()-t.ts)/1000,ageS=F.age(age),ageCls=age<60?'g':age<300?'y':'';
+    let srcTag=t.dex==='PUMP_FUN'?'pf':t.dex==='DEX_BOOST'?'boost':'dex';
+    let srcLabel=t.dex==='PUMP_FUN'?'pump.fun':t.dex==='DEX_BOOST'?'boost':'dex';
+    return'<tr><td class="l">'+F.mint(t.mint)+'</td>'+
+      '<td>'+F.tag(srcTag,srcLabel)+'</td>'+
+      '<td style="font-size:10px" class="'+ageCls+'">'+ageS+'</td></tr>';
+  }).join('');
+}
+// PnL chart - line chart
+let chartData=[];
+function updateChart(trades){
+  if(!trades.length){document.getElementById('chart-empty').style.display='flex';return}
+  document.getElementById('chart-empty').style.display='none';
+  let canvas=document.getElementById('chart-canvas');
+  let ctx=canvas.getContext('2d');
+  let W=canvas.parentElement.clientWidth-16;
+  canvas.width=W;canvas.height=120;
+  ctx.clearRect(0,0,W,120);
+  let vals=[],sum=0;
+  for(let i=trades.length-1;i>=0;i--){sum+=trades[i].pnlSol;vals.push(sum)}
+  let min=Math.min(0,...vals),max=Math.max(0,...vals);
+  let range=Math.max(max-min,0.001);
+  let padX=10,padY=20,w=W-padX*2,h=120-padY*2;
+  // Grid
+  ctx.strokeStyle='rgba(255,255,255,0.04)';ctx.lineWidth=1;
+  for(let i=0;i<=4;i++){let y=padY+h*i/4;ctx.beginPath();ctx.moveTo(padX,y);ctx.lineTo(W-padX,y);ctx.stroke()}
+  // Zero line
+  let zy=padY+h-(0-min)/range*h;
+  ctx.strokeStyle='#444c56';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(padX,zy);ctx.lineTo(W-padX,zy);ctx.stroke();
+  // Line
+  ctx.strokeStyle='#a371f7';ctx.lineWidth=2;ctx.lineJoin='round';
+  ctx.beginPath();
+  for(let i=0;i<vals.length;i++){
+    let x=padX+(w/(vals.length-1||1))*i;
+    let y=padY+h-((vals[i]-min)/range)*h;
+    if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  // Gradient fill
+  let grad=ctx.createLinearGradient(0,padY,0,padY+h);
+  grad.addColorStop(0,'rgba(163,113,247,0.15)');grad.addColorStop(1,'rgba(163,113,247,0)');
+  ctx.fillStyle=grad;ctx.lineTo(W-padX,padY+h);ctx.lineTo(padX,padY+h);ctx.closePath();ctx.fill();
+  // PnL label
+  ctx.fillStyle='#6e7681';ctx.font='9px monospace';
+  ctx.fillText('cumulative PnL',padX+2,padY-8);
+  let final=vals[vals.length-1];
+  ctx.fillStyle=final>=0?'#3fb950':'#f85149';
+  ctx.fillText((final>=0?'+':'')+final.toFixed(4)+' SOL',W-padX-ctx.measureText((final>=0?'+':'')+final.toFixed(4)+' SOL').width,padY-8);
+}
+function buildUI(){
+  Q('main').innerHTML=
+    '<div class="stats" id="stats"></div>'+
+    '<div class="bar">'+
+      '<b style="font-size:9px;color:var(--dim);letter-spacing:.5px">CONTROLS</b>'+
+      '<button class="btn g" onclick="api(\'/autotrade/start\',\'POST\').then(refresh)">▶ START SNIPER</button>'+
+      '<button class="btn r" onclick="api(\'/autotrade/stop\',\'POST\').then(refresh)">■ STOP</button>'+
+      '<span class="bar-sep"></span>'+
+      '<span style="font-size:9px;color:var(--dim)">≥10 buys &gt;$10/60s · S&lt;2x buys · 0.03 SOL entry · TP 100% · SL 20% · Trail 15%</span>'+
+    '</div>'+
+    '<div class="grid2">'+
+      '<div class="panel"><div class="panel-h"><h2>POSITIONS — LIVE PNL</h2><span class="count" id="live-count">0</span></div>'+
+        '<div class="scroll"><table><thead><tr><th class="l">Token</th><th>Entry $</th><th>Price $</th><th>PnL SOL</th><th>PnL %</th><th>Value SOL</th><th>Held</th></tr></thead>'+
+        '<tbody id="live-tb"><tr class="empty"><td colspan="7">Loading...</td></tr></tbody></table></div></div>'+
+      '<div class="panel"><div class="panel-h"><h2>SIGNAL LOG</h2><span class="count" id="sig-count">0</span></div>'+
+        '<div class="scroll"><table><thead><tr><th class="l">Token</th><th>Score</th><th>Action</th><th>Reasons</th></tr></thead>'+
+        '<tbody id="sig-tb"><tr class="empty"><td colspan="4">No signals yet</td></tr></tbody></table></div></div>'+
+    '</div>'+
+    '<div class="grid2">'+
+      '<div class="panel"><div class="panel-h"><h2>TRADE HISTORY</h2><span class="count" id="hist-count">0</span></div>'+
+        '<div class="scroll sm"><table><thead><tr><th class="l">#</th><th class="l">Token</th><th>PnL SOL</th><th>PnL %</th><th>Entry $</th><th>Exit $</th><th>Held</th><th></th></tr></thead>'+
+        '<tbody id="hist-tb"><tr class="empty"><td colspan="8">No trades yet</td></tr></tbody></table></div></div>'+
+      '<div class="panel"><div class="panel-h"><h2>SCANNER FEED</h2><span class="count" id="scan-count">0</span></div>'+
+        '<div class="scroll sm"><table><thead><tr><th class="l">Token</th><th>Source</th><th>Age</th></tr></thead>'+
+        '<tbody id="scan-tb"><tr class="empty"><td colspan="3">Monitoring pump.fun...</td></tr></tbody></table></div></div>'+
+    '</div>'+
+    '<div class="panel"><div class="panel-h"><h2>PnL CHART</h2></div>'+
+      '<div class="chart-wrap"><canvas id="chart-canvas"></canvas><div class="chart-empty" id="chart-empty">Waiting for trades...</div></div></div>'+
+    '<div class="panel"><div class="panel-h"><h2>POSITIONS — DETAIL</h2><span class="count" id="pos-count">0</span></div>'+
+      '<div class="scroll"><table><thead><tr><th class="l">Token</th><th>Entry $</th><th>Amount</th><th>PnL SOL</th><th>PnL %</th><th>Value SOL</th><th>Held</th></tr></thead>'+
+      '<tbody id="pos-tb"><tr class="empty"><td colspan="7">No open positions</td></tr></tbody></table></div></div>';
+}
+buildUI();
+let walletAddr='';
+async function pollBalance(){
+  let w=await api('/wallet');
+  if(w&&w.live){
+    walletAddr=w.address;
+    let sol=w.balanceSol||0, usd=w.balanceUsd||0;
+    Q('bal').textContent='LIVE '+sol.toFixed(4)+' SOL ($'+usd.toFixed(2)+')';
+    Q('bal').style.color=sol<0.001?'var(--red)':sol<0.02?'var(--yel)':'var(--grn)';
+    Q('mode-badge').innerHTML='<span class="badge b-live">LIVE</span>';
+  }else{
+    let h=await api('/health');
+    if(!h)return;
+    if(h.paper){Q('bal').textContent='PAPER '+h.paperBal.toFixed(3)+' SOL';Q('bal').style.color='var(--prp)';Q('mode-badge').innerHTML='<span class="badge b-paper">PAPER</span>';}
+  }
+}
+async function togglePaper(){
+  let h=await api('/health');
+  if(!h)return;
+  if(h.paper){
+    let bal=await api('/portfolio');
+    if(!bal)return;
+    let sol=bal.solBalance||0;
+    let msg;
+    if(sol<0.001&&sol>=0)msg='WALLET EMPTY\n\nBalance: 0 SOL\n\nReal trades will FAIL.\n\nSwitch to LIVE anyway?';
+    else if(sol>0&&sol<0.02)msg='LOW BALANCE: '+sol.toFixed(4)+' SOL\n\nSwitch to LIVE anyway?';
+    else msg='Switch to LIVE mode?\n\nBalance: '+sol.toFixed(4)+' SOL';
+    if(!confirm(msg))return;
+    let r=await api('/paper','POST',{action:'stop'});
+    if(r&&r.error){alert(r.msg||'Cannot switch to LIVE');return}
+  }else{
+    await api('/paper','POST',{action:'start',balanceSol:10});
+  }
+  refresh();
+}
+async function toggleAuto(){
+  let h=await api('/health');
+  if(!h)return;
+  if(h.autoTrade)await api('/autotrade/stop','POST');
+  else await api('/autotrade/start','POST');
+  refresh();
+}
+pollBalance(); // initial load
+// ── SSE REAL-TIME STREAM ──
+const SSE = new EventSource(A+'/stream');
+SSE.addEventListener('state', function(e) {
+  try {
+    let s = JSON.parse(e.data);
+    Q('conn').className = 'conn ' + (s.scannerAlive ? 'on' : 'off');
+    Q('scanner-msg').textContent = s.scannerAlive ? ('scanner live · ' + F.big(s.scannerMsgs) + ' msgs') : 'scanner reconnecting';
+    Q('mode-badge').innerHTML = s.liveMode ? '<span class="badge b-live">LIVE</span>' : (s.paperOn ? '<span class="badge b-paper">PAPER</span>' : '<span class="badge b-off">OFF</span>');
+    Q('auto-badge').innerHTML = s.autoTradeOn ? '<span class="badge b-on">SNIPER ON</span>' : '<span class="badge b-off">SNIPER OFF</span>';
+    Q('paper-btn').textContent = s.paperOn ? 'PAPER' : 'LIVE';
+    Q('paper-btn').className = s.paperOn ? 'btn p' : 'btn g';
+    Q('auto-btn').textContent = s.autoTradeOn ? 'STOP' : 'START';
+    Q('auto-btn').className = s.autoTradeOn ? 'btn r' : 'btn g';
+    if (!s.liveMode && s.paperOn) { Q('bal').textContent = 'PAPER ' + (s.paperBal||0).toFixed(3) + ' SOL'; Q('bal').style.color = 'var(--prp)'; }
+    // Live balance updated by pollBalance interval
+  } catch(ex) {}
+});
+SSE.addEventListener('trade', function(e) {
+  try {
+    let t = JSON.parse(e.data);
+    let tb = Q('hist-tb');
+    let cls = (+t.pnlSol||0) >= 0 ? 'pnl-up' : 'pnl-down';
+    let tag = cls === 'pnl-up' ? F.tag('w','W') : F.tag('l','L');
+    let row = '<tr><td class="l" style="color:var(--dim);font-size:10px">#'+t.id+'</td>'+
+      '<td class="l">'+F.mint(t.mint)+'</td>'+
+      '<td class="mono '+cls+'">'+F.sol4(t.pnlSol)+'</td>'+
+      '<td class="'+cls+'">'+F.pct(t.pnlPct)+'</td>'+
+      '<td class="mono" style="color:var(--dim)">'+F.usd8(t.entryPriceUsd)+'</td>'+
+      '<td class="mono" style="color:var(--dim)">'+(t.exitPriceUsd?F.usd8(t.exitPriceUsd):'—')+'</td>'+
+      '<td style="color:var(--dim);font-size:10px">'+F.age(t.holdSec)+'</td>'+
+      '<td>'+tag+'</td></tr>';
+    if (tb.firstChild && tb.firstChild.nodeName === 'TR') tb.insertBefore(document.createElement('tr'), tb.firstChild).outerHTML = row;
+    else tb.innerHTML = row;
+    Q('hist-count').textContent = (parseInt(Q('hist-count').textContent)||0) + 1;
+  } catch(ex) {}
+});
+SSE.addEventListener('journal', function(e) {
+  try {
+    let j = JSON.parse(e.data);
+    if (j.action === 'AUTO_BUY' || j.action === 'BUY') {
+      Q('live-tb').innerHTML = '<tr style="animation:pulse 0.5s"><td class="l" style="color:var(--grn);font-weight:700">⚡ BUY '+F.mint(j.mint)+'</td>'+
+        '<td class="mono">'+F.sol4(j.sol)+' SOL</td><td colspan="5" style="color:var(--dim)">score:'+(j.notes||'')+'</td></tr>';
+      Q('live-count').textContent = '1';
+    }
+  } catch(ex) {}
+});
+SSE.addEventListener('scan', function(e) {
+  try { let list = JSON.parse(e.data); renderScanner(Array.isArray(list)?list:[]); } catch(ex) {}
+});
+SSE.addEventListener('scores', function(e) {
+  try { let list = JSON.parse(e.data); renderSignals(Array.isArray(list)?list:[]); } catch(ex) {}
+});
+SSE.addEventListener('stats', function(e) {
+  try {
+    let s = JSON.parse(e.data);
+    let wr = s.wins + s.losses > 0 ? ((s.wins/(s.wins+s.losses))*100).toFixed(0)+'%' : 'N/A';
+    let wrCls = parseFloat(wr) >= 50 ? 'g' : 'r';
+    Q('stats').innerHTML = [
+      {v:F.sol('?'),l:'BALANCE',c:'b'},
+      {v:wr,l:'WIN RATE',c:wrCls},
+      {v:'—',l:'BEST PNL',c:'g'},
+      {v:'—',l:'WORST PNL',c:'r'},
+      {v:s.trades||0,l:'TOTAL TRADES',c:''},
+      {v:s.wins||0,l:'WINS',c:'g'},
+      {v:s.losses||0,l:'LOSSES',c:'r'},
+      {v:F.sol(s.dailyPnl||0),l:'DAILY PNL',c:s.dailyPnl>=0?'g':'r'},
+      {v:s.cbLosses||0,l:'CB LOSSES',c:s.cbLosses>=3?'r':'y'}
+    ].map(function(c){return '<div class="st"><div class="v '+c.c+'">'+c.v+'</div><div class="l">'+c.l+'</div></div>';}).join('');
+  } catch(ex) {}
+});
+// Initial full refresh for signals/scanner/chart + backup poll
+refresh();
+setInterval(refresh, 5000);
+pollLive();setInterval(pollLive, 1000);
+pollBalance();setInterval(pollBalance, 3000);
+</script>
+</body>
+</html>

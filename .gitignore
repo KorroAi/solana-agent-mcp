@@ -1,0 +1,23 @@
+node_modules/
+dist/
+.env
+*.log
+trades.json
+farm-log.json
+journal.jsonl
+positions.json
+state.json
+presets.json
+
+# Internal planning documents (not for public repo)
+FIX_PLAN.md
+LIVE_READINESS_ASSESSMENT.md
+STATUS_V9.md
+STRATEGY_V10_LIVE.md
+STRATEGY_V12_PRE_DEX_GRADUATION.md
+STRATEGY_V13_PRE_DEX_ONLY.md
+CHANGELOG.md
+
+# Backups (old versions)
+SNIPER_BACKUP_V7/
+SNIPER_V8_2026-06-24/
