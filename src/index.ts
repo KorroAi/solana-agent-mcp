@@ -601,4 +601,8 @@ async function startMcp() {
 }
 startMcp().catch(e => process.stderr.write(`[mcp] stdio transport failed: ${e.message}\n`));
 
-server.listen(PORT, () => { console.error(`[sniper] V10-MCP | TP${TP1}/${TP2}% TRAIL${TRAIL}% | mcp+http | :${PORT}`); loadState(); startScanner(); startPriceWS(); refreshSolPrice(); setInterval(refreshSolPrice, 60000); setInterval(checkTpSl, 100); setInterval(saveState, 30000); setInterval(() => { const lag = Date.now() - lastScanTs; if (lag > 30000) console.error("[ALERT] Scanner dead " + (lag/1000).toFixed(0) + "s!"); const stuck = [...pos.values()].filter(x => !x.sold && (Date.now() - x.ts) > 240000 && x.peakPriceUsd <= x.entryPriceUsd); if (stuck.length) console.error("[ALERT] Stuck positions: " + stuck.length); }, 15000); setInterval(() => sse("heartbeat", { ts: Date.now() }), 15000); });
+server.on("error", (e: any) => {
+  if (e.code === "EADDRINUSE") process.stderr.write(`[http] port ${PORT} in use — HTTP skipped, MCP stdio still active\n`);
+  else throw e;
+});
+server.listen(PORT, () => { process.stderr.write(`[http] V10-MCP | :${PORT} | mcp+http ready\n`); loadState(); startScanner(); startPriceWS(); refreshSolPrice(); setInterval(refreshSolPrice, 60000); setInterval(checkTpSl, 100); setInterval(saveState, 30000); setInterval(() => { const lag = Date.now() - lastScanTs; if (lag > 30000) process.stderr.write(`[ALERT] Scanner dead ${(lag/1000).toFixed(0)}s!\n`); const stuck = [...pos.values()].filter(x => !x.sold && (Date.now() - x.ts) > 240000 && x.peakPriceUsd <= x.entryPriceUsd); if (stuck.length) process.stderr.write(`[ALERT] Stuck: ${stuck.length}\n`); }, 15000); setInterval(() => sse("heartbeat", { ts: Date.now() }), 15000); });
