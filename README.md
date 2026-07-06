@@ -1,222 +1,121 @@
 # Solana Agent MCP
 
-**Your on-chain copilot.** Check balances, send SOL, swap tokens, trade pump.fun memecoins — all through natural conversation via MCP stdio. Zero API keys needed for the agent.
+<p align="center">
+  <img src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg" alt="License: AGPL-3.0">
+  <img src="https://img.shields.io/badge/version-10.0.0-green.svg" alt="Version 10.0.0">
+  <img src="https://img.shields.io/badge/MCP-stdio-orange.svg" alt="MCP stdio">
+  <img src="https://img.shields.io/badge/Solana-mainnet-blueviolet.svg" alt="Solana Mainnet">
+  <img src="https://img.shields.io/badge/tools-14-brightgreen.svg" alt="14 MCP Tools">
+</p>
 
-## Quick Start
-
-```bash
-git clone https://github.com/KorroAi/solana-agent-mcp
-cd solana-agent-mcp
-npm install
-cp .env.example .env
-# Add your Helius API key + Phantom private key to .env
-npm run dev
-```
-
-Then type `/solana` in Claude Code. The wizard will guide you.
-
-## How It Works
-
-```
-You: "send 0.01 SOL to 7bN2...xyz"
-     │
-     ▼
-Claude Code ←→ MCP stdio ←→ solana-agent-mcp ←→ Solana Blockchain
-                              (your Phantom wallet)
-```
-
-**No API keys shared with the agent.** The MCP server runs locally, signs transactions with your key, and returns results. Your private key never leaves your machine.
-
-## Features
-
-- **Wallet**: Check balance, view address
-- **Send**: SOL and SPL token transfers
-- **Swap**: Jupiter aggregator (best price routing)
-- **Scan**: Real-time pump.fun token discovery
-- **Trade**: Buy/sell pump.fun memecoins
-- **Info**: Token metadata, transaction lookup
-- **Devnet**: Free SOL airdrops for testing
+**Your on-chain copilot.** An MCP (Model Context Protocol) server that gives AI agents full read/write access to the Solana blockchain — check balances, send SOL, swap tokens via Jupiter, scan pump.fun tokens in real-time, and trade memecoins. All through natural conversation. No API keys shared with the agent.
 
 ## Architecture
 
 ```
-Agent (Claude Desktop / Cursor) → stdio (MCP) ─┐
-                                                  ├→ Scanner → Momentum → Signals → Auto-Trader
-Browser Dashboard → HTTP :8791 ──────────────────┘
-                    SSE Stream → Real-time UI
+┌──────────────┐     MCP stdio (local)     ┌──────────────────────┐
+│  AI Agent    │◄─────────────────────────►│  solana-agent-mcp    │
+│  (Claude)    │   No network, no auth     │  (your machine)      │
+└──────────────┘                           └────────┬─────────────┘
+                                                    │
+                                          Helius WS + RPC
+                                          Jupiter API
+                                          Pump.fun API
+                                                    │
+                                              ┌─────▼──────┐
+                                              │  Solana    │
+                                              │  Blockchain│
+                                              └────────────┘
 ```
 
-**Dual transport**: MCP stdio for AI agents (no auth, local process) + HTTP on `:8791` for browser dashboards.
+The MCP server runs as a local process. AI agents connect via stdin/stdout (standard MCP protocol). Your private key signs transactions locally — it never leaves your machine. The agent never sees your key.
 
-## AI Agent Connection (MCP stdio)
-
-Agents connect via the standard MCP protocol over stdin/stdout. **No API key, no network, no auth** — the agent spawns the server as a child process.
-
-### Claude Desktop config
-
-```json
-{
-  "mcpServers": {
-    "solana-agent": {
-      "command": "npx",
-      "args": ["tsx", "C:/Users/kevin/Desktop/free-claude-code/solana-agent-mcp/src/index.ts"]
-    }
-  }
-}
-```
-
-### Available MCP Tools (12 total)
-
-**Read tools — query blockchain state**
-
-| Tool | Description |
-|------|-------------|
-| `solana_get_balance` | Get SOL balance for any wallet address |
-| `solana_get_token_balance` | Get SPL token balance for a wallet + mint |
-| `solana_get_token_info` | Get on-chain token metadata (decimals, supply, authorities) |
-| `solana_get_price` | Current SOL price in USD |
-| `solana_scan_tokens` | Recent pump.fun tokens from real-time scanner |
-| `solana_get_transaction` | Get transaction details by signature |
-| `solana_get_wallet` | Get the MCP server's wallet address + SOL balance |
-| `solana_health` | System health: RPC, scanner, wallet, live mode |
-
-**Write tools — execute real transactions (requires PRIVATE_KEY in .env)**
-
-| Tool | Description |
-|------|-------------|
-| `solana_send_sol` | Send SOL to any address — real tx, costs gas |
-| `solana_send_token` | Send SPL tokens to any address |
-| `solana_swap` | Swap tokens via Jupiter aggregator (best price routing) |
-| `solana_request_airdrop` | Request SOL airdrop on devnet (testnet only) |
-
-### Available MCP Resources (2 total)
-
-| Resource URI | Content |
-|-------------|---------|
-| `solana://price` | Current SOL/USD price |
-| `solana://tokens/recent` | Last 20 tokens from pump.fun scanner |
-
-## Quick Start
+## Installation
 
 ```bash
+git clone https://github.com/KorroAi/solana-agent-mcp.git
+cd solana-agent-mcp
 npm install
 cp .env.example .env
-# Add your Helius API keys to .env
+```
+
+Edit `.env`:
+```env
+HELIUS_API_KEYS=your-key-1,your-key-2    # Free at helius.dev
+PRIVATE_KEY=your-phantom-base58-key       # Optional — for live transactions
+SOLANA_MCP_PORT=8791                      # Default
+```
+
+```bash
 npm run dev
 ```
 
-Server starts on `http://localhost:8791`.
+Then type `/solana` in Claude Code. The wizard guides you.
 
-### Requirements
+## MCP Tools (14 total)
 
-- Node.js 18+
-- Helius API key (free tier works — get one at [helius.dev](https://helius.dev))
+### Read — Query blockchain state
 
-## API Reference
+| Tool | Parameters | Returns |
+|------|-----------|---------|
+| `solana_get_balance` | `address` | SOL balance + lamports |
+| `solana_get_token_balance` | `address`, `mint` | SPL token balance |
+| `solana_get_token_info` | `mint` | Decimals, supply, authorities |
+| `solana_get_price` | — | SOL/USD price |
+| `solana_scan_tokens` | — | Recent pump.fun tokens |
+| `solana_get_transaction` | `signature` | Tx details + status |
+| `solana_get_wallet` | — | Server wallet address + balance |
+| `solana_health` | — | RPC status, scanner, wallet |
 
-### Core Endpoints
+### Write — Execute transactions (requires PRIVATE_KEY)
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/health` | GET | Server health, scanner status, positions, daily PnL |
-| `/setup` | GET | Configuration status (API keys, mode) |
-| `/settings` | GET | All trading parameters (SL, TP, trail, momentum) |
-| `/rpc-health` | GET | RPC circuit breaker status, backoff URLs |
+| Tool | Parameters | Returns |
+|------|-----------|---------|
+| `solana_send_sol` | `to`, `amount` | Tx signature + Solscan link |
+| `solana_send_token` | `to`, `mint`, `amount` | Tx signature + Solscan link |
+| `solana_swap` | `inputMint`, `outputMint`, `amount`, `slippageBps?` | Tx signature + route |
+| `solana_buy_pump` | `mint`, `amountSOL`, `slippageBps?` | Tx signature + pump.fun link |
+| `solana_sell_pump` | `mint`, `amountSOL?`, `slippageBps?` | Tx signature + Solscan link |
+| `solana_request_airdrop` | `address`, `amount?` | Tx signature (devnet only) |
 
-### Data Endpoints
+## Resources
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/scan` | GET | Recent tokens detected by the pump.fun scanner |
-| `/scores` | GET | Last 20 signal evaluations with scores |
-| `/portfolio` | GET | Active positions with PnL, trade stats |
-| `/positions` | GET | Active positions (minimal) |
-| `/positions-live` | GET | Active positions with live price data |
-| `/trades` | GET | Trade history (supports `?limit=N`) |
-| `/stats` | GET | Win/loss ratio, best/worst PnL, loser count |
-| `/losers` | GET | Blacklisted mints (never re-buy) |
+| URI | Content |
+|-----|---------|
+| `solana://price` | Current SOL/USD price |
+| `solana://tokens/recent` | Last 20 pump.fun tokens |
 
-### Trading Endpoints
+## Safety
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/autotrade/start` | POST | Start automated paper trading |
-| `/autotrade/stop` | POST | Stop automated paper trading |
-| `/autotrade/status` | GET | Check if auto-trade is active |
-| `/paper` | POST | Start/stop paper mode, reset balance |
+- **Local signing**: Private key never leaves your machine
+- **Confirmation gate**: Transactions >0.01 SOL require explicit confirmation
+- **Solscan links**: Every transaction returns an explorer link
+- **Read-only by default**: No wallet = no write access, everything still works
+- **No API keys shared**: The agent communicates via local stdio, not over the network
+- **Balance guard**: Won't trade below 0.01 SOL reserve
 
-### UI
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/dashboard` | GET | Main trading dashboard (HTML) |
-| `/farm/dashboard` | GET | Farm dashboard (HTML) |
-| `/stream` | GET | SSE stream for real-time UI updates |
-
-### Debug
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/debug/momentum` | GET | Internal momentum tracker state |
-
-## Trading Strategy
-
-### Signal Pipeline
-
-1. **Scanner** — Watches pump.fun `6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P` program logs for new token mints
-2. **Safety Check** — Verifies mint authority revoked, freeze authority revoked, supply < 1B
-3. **Whale Filter** — Requires `≥2` real buy transactions (from bonding curve reserve delta)
-4. **Momentum Gate** — Early (`≥2 buys`, buy/sell ratio > 1.3) or Confirmed (`≥5 buys`, ratio > 1.3)
-5. **Gradient Gate** — Skips tokens where bonding curve is >40% full
-6. **Direction Gate** — Last 3 events must all be buys (no sellers dumping)
-
-### Exit Strategy
-
-| Rule | Condition |
-|------|-----------|
-| **TP1** | +30% → sell 50% |
-| **TP2** | +60% → sell remaining |
-| **Trail** | Activated at +5%, exits at peak −3% |
-| **Insta-Dump** | −15% in <5 seconds |
-| **Sell-Surge** | Sell volume > 3x buy volume in last 3s |
-| **Dead** | No buy ≥0.02 SOL in last 10s after 5s hold |
-| **SL** | −15% hard stop |
-| **Timeout** | 300s max hold |
-
-### Config (in `src/index.ts`)
-
-```typescript
-SL = 15         // Stop loss %
-TP1 = 30        // Take profit 1 %
-TP2 = 60        // Take profit 2 %
-TRAIL = 3       // Trailing stop %
-MAX_HOLD = 300  // Max hold seconds
-BUY_EARLY = 0.15   // SOL per early buy
-BUY_CONFIRMED = 0.30 // SOL per confirmed buy
-```
-
-## Environment Variables
+## /solana — Slash Command
 
 ```
-HELIUS_API_KEYS=key1,key2,key3    # Comma-separated Helius API keys
-SOLANA_MCP_PORT=8791              # Server port (default: 8791)
+/solana
+> check my balance          → "You have 0.112 SOL (~$8.90)"
+> send 0.01 SOL to 7bN2...  → "Sending... confirmed! tx: 2PFCa..."
+> scan pump.fun tokens      → "4 new tokens detected"
+> swap 0.05 SOL to USDC     → "Best route: SOL→USDC via Jupiter"
+> buy B1bN... for 0.02 SOL  → "Buy executed! pump.fun/coin/B1bN..."
 ```
-
-## Safety Features (V10)
-
-- **Retry with backoff** — All RPC calls retry up to 3 times with exponential backoff
-- **Circuit breaker** — Failed RPC endpoints are temporarily excluded
-- **Price guard** — Entry price never falls below $0.0001 (prevents insta-dump on bad data)
-- **Balance guard** — Never trades below 0.01 SOL reserve
-- **RPC health monitoring** — `/rpc-health` endpoint for debugging
-- **SOL price fallback** — Uses last known price if CoinGecko is unreachable
-
-## Mode
-
-Currently **paper-only**. All trades are simulated with a 10 SOL starting balance. No real transactions are sent to the Solana network.
-
-Live trading infrastructure (wallet sync, on-chain execution, priority fees) is designed but gated behind the paper validation phase per the [LIVE_READINESS_ASSESSMENT](./LIVE_READINESS_ASSESSMENT.md).
 
 ## License
 
-MIT
+**GNU Affero General Public License v3.0 (AGPL-3.0)**
+
+This is strong copyleft. You can use, modify, and distribute this software freely. If you run a modified version as a network service, you MUST release your modifications to the community. Companies cannot take this code, improve it privately, and sell it as a proprietary service.
+
+See [LICENSE](./LICENSE) for the full text.
+
+---
+
+<p align="center">
+  <b>Built by <a href="https://github.com/KorroAi">KORROCORP</a></b><br>
+  <sub>AGPL-3.0 — Free as in freedom. Share your improvements.</sub>
+</p>
