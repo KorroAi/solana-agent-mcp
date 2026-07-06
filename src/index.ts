@@ -6,12 +6,31 @@ import path from "node:path";
 import http from "node:http";
 import https from "node:https";
 import dns from "node:dns";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, Keypair, Connection, Transaction, SystemProgram, sendAndConfirmTransaction, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { createTransferInstruction, getOrCreateAssociatedTokenAccount, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import bs58 from "bs58";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 dotenv.config();
+
+// Wallet — real transaction signing (env var required)
+let wallet: Keypair | null = null;
+let liveConnection: Connection | null = null;
+const LIVE_MODE = process.env.PRIVATE_KEY ? true : false;
+function initWallet() {
+  try {
+    const pk = JSON.parse(process.env.PRIVATE_KEY || "[]");
+    if (pk.length !== 64) { process.stderr.write("[wallet] PRIVATE_KEY not set or invalid — live transactions disabled\n"); return; }
+    wallet = Keypair.fromSecretKey(Uint8Array.from(pk));
+    liveConnection = new Connection(getRPC(), "confirmed");
+    process.stderr.write(`[wallet] loaded: ${wallet.publicKey.toBase58()}\n`);
+  } catch (e: any) { process.stderr.write(`[wallet] init failed: ${e.message}\n`); }
+}
+function getWalletOrFail(): { wallet: Keypair; connection: Connection } {
+  if (!wallet || !liveConnection) throw new Error("PRIVATE_KEY not configured — set it in .env");
+  return { wallet, connection: liveConnection };
+}
 
 const KEYS = (process.env.HELIUS_API_KEYS || process.env.HELIUS_API_KEY || "").split(",").map(k => k.trim()).filter(Boolean);
 const WS_URLS = KEYS.map(k => `wss://mainnet.helius-rpc.com/?api-key=${k}`);
@@ -584,6 +603,58 @@ mcpServer.tool("solana_request_airdrop", "Request SOL airdrop on devnet (testnet
   } catch { return { content: [{ type:"text" as const, text: JSON.stringify({ error:"Airdrop failed — devnet may be throttled" }) }], isError: true }; }
 });
 
+// ── TRANSACTION TOOLS (real blockchain writes — requires PRIVATE_KEY in .env) ──
+
+mcpServer.tool("solana_get_wallet", "Get the MCP server's wallet address and SOL balance", {}, async () => {
+  try {
+    const { wallet, connection } = getWalletOrFail();
+    const bal = await connection.getBalance(wallet.publicKey);
+    return { content: [{ type:"text" as const, text: JSON.stringify({ address: wallet.publicKey.toBase58(), balanceSOL: bal / LAMPORTS_PER_SOL, balanceLamports: bal, liveMode: LIVE_MODE }) }] };
+  } catch (e: any) { return { content: [{ type:"text" as const, text: JSON.stringify({ error: e.message }) }], isError: true }; }
+});
+
+mcpServer.tool("solana_send_sol", "Send SOL to any address — real transaction, costs gas fees", { to: z.string().describe("Destination wallet address"), amount: z.number().describe("SOL amount to send") }, async (args) => {
+  try {
+    const { wallet, connection } = getWalletOrFail();
+    const tx = new Transaction().add(SystemProgram.transfer({ fromPubkey: wallet.publicKey, toPubkey: new PublicKey(args.to), lamports: Math.floor(args.amount * LAMPORTS_PER_SOL) }));
+    const sig = await sendAndConfirmTransaction(connection, tx, [wallet]);
+    return { content: [{ type:"text" as const, text: JSON.stringify({ signature: sig, from: wallet.publicKey.toBase58(), to: args.to, amountSOL: args.amount, explorer: `https://solscan.io/tx/${sig}` }) }] };
+  } catch (e: any) { return { content: [{ type:"text" as const, text: JSON.stringify({ error: e.message }) }], isError: true }; }
+});
+
+mcpServer.tool("solana_send_token", "Send SPL tokens to any address", { to: z.string().describe("Destination wallet address"), mint: z.string().describe("Token mint address"), amount: z.number().describe("Token amount to send") }, async (args) => {
+  try {
+    const { wallet, connection } = getWalletOrFail();
+    const toPubkey = new PublicKey(args.to);
+    const mintPubkey = new PublicKey(args.mint);
+    const fromAta = await getOrCreateAssociatedTokenAccount(connection, wallet, mintPubkey, wallet.publicKey, undefined, "confirmed");
+    const toAta = await getOrCreateAssociatedTokenAccount(connection, wallet, mintPubkey, toPubkey, undefined, "confirmed");
+    const decimals = 6; // default; on-chain lookup is expensive
+    const tx = new Transaction().add(createTransferInstruction(fromAta.address, toAta.address, wallet.publicKey, Math.floor(args.amount * 10 ** decimals), [], TOKEN_PROGRAM_ID));
+    const sig = await sendAndConfirmTransaction(connection, tx, [wallet]);
+    return { content: [{ type:"text" as const, text: JSON.stringify({ signature: sig, from: wallet.publicKey.toBase58(), to: args.to, mint: args.mint, amount: args.amount, explorer: `https://solscan.io/tx/${sig}` }) }] };
+  } catch (e: any) { return { content: [{ type:"text" as const, text: JSON.stringify({ error: e.message }) }], isError: true }; }
+});
+
+mcpServer.tool("solana_swap", "Swap tokens via Jupiter aggregator (best price routing)", { inputMint: z.string().describe("Input token mint (So1111... for SOL)"), outputMint: z.string().describe("Output token mint"), amount: z.number().describe("Amount in SOL/tokens to swap"), slippageBps: z.number().optional().describe("Slippage in basis points (default 100 = 1%)") }, async (args) => {
+  try {
+    const { wallet, connection } = getWalletOrFail();
+    const slippage = args.slippageBps || 100;
+    const amountLamports = Math.floor(args.amount * LAMPORTS_PER_SOL);
+    // Jupiter quote
+    const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=${args.inputMint}&outputMint=${args.outputMint}&amount=${amountLamports}&slippageBps=${slippage}`;
+    const quote = await sysGetJSON(quoteUrl, 8000);
+    if (!quote) return { content: [{ type:"text" as const, text: JSON.stringify({ error:"Jupiter quote failed — no route found" }) }], isError: true };
+    // Jupiter swap tx
+    const swapBody = { quoteResponse: quote, userPublicKey: wallet.publicKey.toBase58(), wrapAndUnwrapSol: true };
+    const swapResp = await sysPostJSON("https://quote-api.jup.ag/v6/swap", swapBody, 8000);
+    if (!swapResp?.swapTransaction) return { content: [{ type:"text" as const, text: JSON.stringify({ error:"Jupiter swap tx failed" }) }], isError: true };
+    const swapTx = Transaction.from(Buffer.from(swapResp.swapTransaction, "base64"));
+    const sig = await sendAndConfirmTransaction(connection, swapTx, [wallet]);
+    return { content: [{ type:"text" as const, text: JSON.stringify({ signature: sig, inputMint: args.inputMint, outputMint: args.outputMint, amount: args.amount, route: quote.routePlan?.map((r:any) => r.swapInfo?.label || "unknown"), explorer: `https://solscan.io/tx/${sig}` }) }] };
+  } catch (e: any) { return { content: [{ type:"text" as const, text: JSON.stringify({ error: e.message }) }], isError: true }; }
+});
+
 mcpServer.tool("solana_health", "System health: RPC status, scanner status, SOL price", {}, async () => ({
   content: [{ type:"text" as const, text: JSON.stringify({
     rpcHealthy: rpcConsecutiveFails < 3,
@@ -591,6 +662,8 @@ mcpServer.tool("solana_health", "System health: RPC status, scanner status, SOL 
     scannerAlive: scanWs?.readyState === WebSocket.OPEN,
     scannerTokensTracked: pfAct.size,
     solPrice: getSolPriceSafe(),
+    liveMode: LIVE_MODE,
+    wallet: wallet?.publicKey.toBase58() || null,
   }) }]
 }));
 
@@ -615,4 +688,4 @@ server.on("error", (e: any) => {
   if (e.code === "EADDRINUSE") process.stderr.write(`[http] port ${PORT} in use — HTTP skipped, MCP stdio still active\n`);
   else throw e;
 });
-server.listen(PORT, () => { process.stderr.write(`[http] V10-MCP | :${PORT} | mcp+http ready\n`); loadState(); startScanner(); startPriceWS(); refreshSolPrice(); setInterval(refreshSolPrice, 60000); setInterval(checkTpSl, 100); setInterval(saveState, 30000); setInterval(() => { const lag = Date.now() - lastScanTs; if (lag > 30000) process.stderr.write(`[ALERT] Scanner dead ${(lag/1000).toFixed(0)}s!\n`); const stuck = [...pos.values()].filter(x => !x.sold && (Date.now() - x.ts) > 240000 && x.peakPriceUsd <= x.entryPriceUsd); if (stuck.length) process.stderr.write(`[ALERT] Stuck: ${stuck.length}\n`); }, 15000); setInterval(() => sse("heartbeat", { ts: Date.now() }), 15000); });
+server.listen(PORT, () => { process.stderr.write(`[http] V10-MCP | :${PORT} | mcp+http ready\n`); initWallet(); loadState(); startScanner(); startPriceWS(); refreshSolPrice(); setInterval(refreshSolPrice, 60000); setInterval(checkTpSl, 100); setInterval(saveState, 30000); setInterval(() => { const lag = Date.now() - lastScanTs; if (lag > 30000) process.stderr.write(`[ALERT] Scanner dead ${(lag/1000).toFixed(0)}s!\n`); const stuck = [...pos.values()].filter(x => !x.sold && (Date.now() - x.ts) > 240000 && x.peakPriceUsd <= x.entryPriceUsd); if (stuck.length) process.stderr.write(`[ALERT] Stuck: ${stuck.length}\n`); }, 15000); setInterval(() => sse("heartbeat", { ts: Date.now() }), 15000); });

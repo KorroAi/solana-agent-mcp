@@ -30,9 +30,9 @@ Agents connect via the standard MCP protocol over stdin/stdout. **No API key, no
 }
 ```
 
-### Available MCP Tools (8 total)
+### Available MCP Tools (12 total)
 
-**Blockchain interaction — any agent can read/write Solana**
+**Read tools — query blockchain state**
 
 | Tool | Description |
 |------|-------------|
@@ -42,8 +42,17 @@ Agents connect via the standard MCP protocol over stdin/stdout. **No API key, no
 | `solana_get_price` | Current SOL price in USD |
 | `solana_scan_tokens` | Recent pump.fun tokens from real-time scanner |
 | `solana_get_transaction` | Get transaction details by signature |
+| `solana_get_wallet` | Get the MCP server's wallet address + SOL balance |
+| `solana_health` | System health: RPC, scanner, wallet, live mode |
+
+**Write tools — execute real transactions (requires PRIVATE_KEY in .env)**
+
+| Tool | Description |
+|------|-------------|
+| `solana_send_sol` | Send SOL to any address — real tx, costs gas |
+| `solana_send_token` | Send SPL tokens to any address |
+| `solana_swap` | Swap tokens via Jupiter aggregator (best price routing) |
 | `solana_request_airdrop` | Request SOL airdrop on devnet (testnet only) |
-| `solana_health` | System health: RPC status, scanner, SOL price |
 
 ### Available MCP Resources (2 total)
 
