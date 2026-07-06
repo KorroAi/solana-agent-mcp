@@ -1,6 +1,41 @@
 # Solana Agent MCP
 
-Real-time Solana pump.fun token scanner with MCP stdio transport + HTTP REST API. AI agents connect natively via stdin/stdout — **no API key needed**.
+**Your on-chain copilot.** Check balances, send SOL, swap tokens, trade pump.fun memecoins — all through natural conversation via MCP stdio. Zero API keys needed for the agent.
+
+## Quick Start
+
+```bash
+git clone https://github.com/KorroAi/solana-agent-mcp
+cd solana-agent-mcp
+npm install
+cp .env.example .env
+# Add your Helius API key + Phantom private key to .env
+npm run dev
+```
+
+Then type `/solana` in Claude Code. The wizard will guide you.
+
+## How It Works
+
+```
+You: "send 0.01 SOL to 7bN2...xyz"
+     │
+     ▼
+Claude Code ←→ MCP stdio ←→ solana-agent-mcp ←→ Solana Blockchain
+                              (your Phantom wallet)
+```
+
+**No API keys shared with the agent.** The MCP server runs locally, signs transactions with your key, and returns results. Your private key never leaves your machine.
+
+## Features
+
+- **Wallet**: Check balance, view address
+- **Send**: SOL and SPL token transfers
+- **Swap**: Jupiter aggregator (best price routing)
+- **Scan**: Real-time pump.fun token discovery
+- **Trade**: Buy/sell pump.fun memecoins
+- **Info**: Token metadata, transaction lookup
+- **Devnet**: Free SOL airdrops for testing
 
 ## Architecture
 
