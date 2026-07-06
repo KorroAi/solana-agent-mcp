@@ -1,6 +1,10 @@
 # Solana Agent MCP
 
 <p align="center">
+  <img src="logo.png" alt="Solana Agent MCP" width="600">
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg" alt="License: AGPL-3.0">
   <img src="https://img.shields.io/badge/version-10.0.0-green.svg" alt="Version 10.0.0">
   <img src="https://img.shields.io/badge/MCP-stdio-orange.svg" alt="MCP stdio">
