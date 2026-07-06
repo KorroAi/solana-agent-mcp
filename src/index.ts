@@ -29,7 +29,7 @@ function initWallet() {
       if (arr.length !== 64) throw new Error("JSON array must have 64 bytes");
       secretKey = Uint8Array.from(arr);
     } else {
-      // base58 format (Phantom export): dVJ9ucWgCZ...
+      // base58 format (Phantom export)
       secretKey = bs58.decode(raw);
     }
     wallet = Keypair.fromSecretKey(secretKey);
