@@ -10,6 +10,7 @@ import { PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
 dotenv.config();
 
 const KEYS = (process.env.HELIUS_API_KEYS || process.env.HELIUS_API_KEY || "").split(",").map(k => k.trim()).filter(Boolean);
@@ -544,25 +545,18 @@ const mcpServer = new McpServer(
   { capabilities: { tools: {}, resources: {} } }
 );
 
-mcpServer.tool("solana_get_balance", "Get SOL balance for any Solana wallet address", {}, async (args: any) => {
-  const address = (args?.address || "").trim();
-  if (!address) return { content: [{ type:"text" as const, text: JSON.stringify({ error:"Provide 'address' parameter" }) }], isError: true };
-  const bal = await getSolBalance(address);
-  return { content: [{ type:"text" as const, text: JSON.stringify({ address, balanceSOL: bal, balanceLamports: bal !== null ? Math.floor(bal * 1e9) : null }) }] };
+mcpServer.tool("solana_get_balance", "Get SOL balance for any Solana wallet address", { address: z.string().describe("Solana wallet address") }, async (args) => {
+  const bal = await getSolBalance(args.address);
+  return { content: [{ type:"text" as const, text: JSON.stringify({ address: args.address, balanceSOL: bal, balanceLamports: bal !== null ? Math.floor(bal * 1e9) : null }) }] };
 });
 
-mcpServer.tool("solana_get_token_balance", "Get SPL token balance for a wallet address and token mint", {}, async (args: any) => {
-  const address = (args?.address || "").trim();
-  const mint = (args?.mint || "").trim();
-  if (!address || !mint) return { content: [{ type:"text" as const, text: JSON.stringify({ error:"Provide 'address' and 'mint' parameters" }) }], isError: true };
-  const bal = await getTokenBalance(address, mint);
-  return { content: [{ type:"text" as const, text: JSON.stringify({ address, mint, balance: bal }) }] };
+mcpServer.tool("solana_get_token_balance", "Get SPL token balance for a wallet address and token mint", { address: z.string(), mint: z.string() }, async (args) => {
+  const bal = await getTokenBalance(args.address, args.mint);
+  return { content: [{ type:"text" as const, text: JSON.stringify({ address: args.address, mint: args.mint, balance: bal }) }] };
 });
 
-mcpServer.tool("solana_get_token_info", "Get on-chain metadata for any SPL token: decimals, supply, authorities", {}, async (args: any) => {
-  const mint = (args?.mint || "").trim();
-  if (!mint) return { content: [{ type:"text" as const, text: JSON.stringify({ error:"Provide 'mint' parameter" }) }], isError: true };
-  const info = await getTokenMetadata(mint);
+mcpServer.tool("solana_get_token_info", "Get on-chain metadata for any SPL token: decimals, supply, authorities", { mint: z.string().describe("Token mint address") }, async (args) => {
+  const info = await getTokenMetadata(args.mint);
   if (!info) return { content: [{ type:"text" as const, text: JSON.stringify({ error:"Token not found or invalid mint address" }) }], isError: true };
   return { content: [{ type:"text" as const, text: JSON.stringify({ ...info, mintRevoked: info.mintAuthority === null, freezeRevoked: info.freezeAuthority === null }) }] };
 });
@@ -576,21 +570,17 @@ mcpServer.tool("solana_scan_tokens", "Scan recent pump.fun tokens from real-time
   return { content: [{ type:"text" as const, text: JSON.stringify({ scannerAlive: scanWs?.readyState === WebSocket.OPEN, count: tokens.length, tokens }) }] };
 });
 
-mcpServer.tool("solana_get_transaction", "Get transaction details by signature", {}, async (args: any) => {
-  const sig = (args?.signature || "").trim();
-  if (!sig) return { content: [{ type:"text" as const, text: JSON.stringify({ error:"Provide 'signature' parameter" }) }], isError: true };
-  const tx = await getTxDetails(sig);
+mcpServer.tool("solana_get_transaction", "Get transaction details by signature", { signature: z.string().describe("Transaction signature") }, async (args) => {
+  const tx = await getTxDetails(args.signature);
   if (!tx) return { content: [{ type:"text" as const, text: JSON.stringify({ error:"Transaction not found" }) }], isError: true };
   return { content: [{ type:"text" as const, text: JSON.stringify(tx) }] };
 });
 
-mcpServer.tool("solana_request_airdrop", "Request SOL airdrop on devnet (testnet only, not mainnet)", {}, async (args: any) => {
-  const address = (args?.address || "").trim();
-  const amount = Number(args?.amount) || 1;
-  if (!address) return { content: [{ type:"text" as const, text: JSON.stringify({ error:"Provide 'address' parameter" }) }], isError: true };
+mcpServer.tool("solana_request_airdrop", "Request SOL airdrop on devnet (testnet only, not mainnet)", { address: z.string().describe("Solana wallet address"), amount: z.number().optional().describe("SOL amount (default 1)") }, async (args) => {
+  const amount = args.amount || 1;
   try {
-    const d = await sysPostJSON("https://api.devnet.solana.com", { jsonrpc:"2.0", id:1, method:"requestAirdrop", params:[address, Math.floor(amount * 1e9)] }, 15000);
-    return { content: [{ type:"text" as const, text: JSON.stringify({ address, amountSOL: amount, signature: d?.result || null, network: "devnet" }) }] };
+    const d = await sysPostJSON("https://api.devnet.solana.com", { jsonrpc:"2.0", id:1, method:"requestAirdrop", params:[args.address, Math.floor(amount * 1e9)] }, 15000);
+    return { content: [{ type:"text" as const, text: JSON.stringify({ address: args.address, amountSOL: amount, signature: d?.result || null, network: "devnet" }) }] };
   } catch { return { content: [{ type:"text" as const, text: JSON.stringify({ error:"Airdrop failed — devnet may be throttled" }) }], isError: true }; }
 });
 
