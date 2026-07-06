@@ -19,7 +19,7 @@ $ /solana
 ║     SOLANA AGENT — Your On-Chain Copilot ║
 ╚══════════════════════════════════════════╝
 
-🔐 Wallet detected: 8QcRxh...me5q
+🔐 Wallet detected: 7nXbWq...me5q
 💰 Balance: 0.112 SOL (~$8.90)
 🔗 Live transactions: ENABLED
 
@@ -34,7 +34,7 @@ $ /solana
 
 > check my balance
 
-  Address: 8QcRxhEGAqCAiwcCTFq97xUX18GMTYqbjMFjrZYfme5q
+  Address: 7nXbWqEGAqCAiwcCTFq97xUX18GMTYqbjMFjrZYfme5q
   Balance: 0.112406169 SOL ($8.90 USD)
 
 > what's the SOL price?
