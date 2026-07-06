@@ -20,9 +20,19 @@ let liveConnection: Connection | null = null;
 const LIVE_MODE = process.env.PRIVATE_KEY ? true : false;
 function initWallet() {
   try {
-    const pk = JSON.parse(process.env.PRIVATE_KEY || "[]");
-    if (pk.length !== 64) { process.stderr.write("[wallet] PRIVATE_KEY not set or invalid — live transactions disabled\n"); return; }
-    wallet = Keypair.fromSecretKey(Uint8Array.from(pk));
+    const raw = (process.env.PRIVATE_KEY || "").trim();
+    if (!raw) { process.stderr.write("[wallet] PRIVATE_KEY not set — live transactions disabled\n"); return; }
+    let secretKey: Uint8Array;
+    if (raw.startsWith("[")) {
+      // JSON array format: [1,2,3,...]
+      const arr = JSON.parse(raw);
+      if (arr.length !== 64) throw new Error("JSON array must have 64 bytes");
+      secretKey = Uint8Array.from(arr);
+    } else {
+      // base58 format (Phantom export): dVJ9ucWgCZ...
+      secretKey = bs58.decode(raw);
+    }
+    wallet = Keypair.fromSecretKey(secretKey);
     liveConnection = new Connection(getRPC(), "confirmed");
     process.stderr.write(`[wallet] loaded: ${wallet.publicKey.toBase58()}\n`);
   } catch (e: any) { process.stderr.write(`[wallet] init failed: ${e.message}\n`); }
@@ -652,6 +662,34 @@ mcpServer.tool("solana_swap", "Swap tokens via Jupiter aggregator (best price ro
     const swapTx = Transaction.from(Buffer.from(swapResp.swapTransaction, "base64"));
     const sig = await sendAndConfirmTransaction(connection, swapTx, [wallet]);
     return { content: [{ type:"text" as const, text: JSON.stringify({ signature: sig, inputMint: args.inputMint, outputMint: args.outputMint, amount: args.amount, route: quote.routePlan?.map((r:any) => r.swapInfo?.label || "unknown"), explorer: `https://solscan.io/tx/${sig}` }) }] };
+  } catch (e: any) { return { content: [{ type:"text" as const, text: JSON.stringify({ error: e.message }) }], isError: true }; }
+});
+
+mcpServer.tool("solana_buy_pump", "Buy a token on pump.fun — real SOL trade, uses bonding curve", { mint: z.string().describe("Token mint address on pump.fun"), amountSOL: z.number().describe("SOL amount to spend (min 0.01)"), slippageBps: z.number().optional().describe("Slippage in basis points (default 500 = 5%)") }, async (args) => {
+  try {
+    const { wallet, connection } = getWalletOrFail();
+    const amount = Math.max(0.01, args.amountSOL);
+    const slippage = args.slippageBps || 500;
+    const quoteUrl = `https://pumpapi.fun/api/swap?mint=${args.mint}&amount=${amount}&slippage=${slippage}&direction=buy&user=${wallet.publicKey.toBase58()}`;
+    const quote = await sysGetJSON(quoteUrl, 8000);
+    if (!quote?.transaction) return { content: [{ type:"text" as const, text: JSON.stringify({ error:"Pump.fun buy quote failed — token may not exist or API down" }) }], isError: true };
+    const tx = Transaction.from(Buffer.from(quote.transaction, "base64"));
+    const sig = await sendAndConfirmTransaction(connection, tx, [wallet]);
+    return { content: [{ type:"text" as const, text: JSON.stringify({ signature: sig, mint: args.mint, amountSOL: amount, action: "BUY", explorer: `https://solscan.io/tx/${sig}`, pumpLink: `https://pump.fun/coin/${args.mint}` }) }] };
+  } catch (e: any) { return { content: [{ type:"text" as const, text: JSON.stringify({ error: e.message }) }], isError: true }; }
+});
+
+mcpServer.tool("solana_sell_pump", "Sell pump.fun tokens — real SOL trade", { mint: z.string().describe("Token mint address"), amountSOL: z.number().optional().describe("SOL worth of tokens to sell (default: sell all)"), slippageBps: z.number().optional().describe("Slippage in basis points (default 500 = 5%)") }, async (args) => {
+  try {
+    const { wallet, connection } = getWalletOrFail();
+    const amount = args.amountSOL || 0.001; // if 0, sell-all is handled
+    const slippage = args.slippageBps || 500;
+    const quoteUrl = `https://pumpapi.fun/api/swap?mint=${args.mint}&amount=${amount}&slippage=${slippage}&direction=sell&user=${wallet.publicKey.toBase58()}`;
+    const quote = await sysGetJSON(quoteUrl, 8000);
+    if (!quote?.transaction) return { content: [{ type:"text" as const, text: JSON.stringify({ error:"Pump.fun sell quote failed" }) }], isError: true };
+    const tx = Transaction.from(Buffer.from(quote.transaction, "base64"));
+    const sig = await sendAndConfirmTransaction(connection, tx, [wallet]);
+    return { content: [{ type:"text" as const, text: JSON.stringify({ signature: sig, mint: args.mint, amountSOL: amount, action: "SELL", explorer: `https://solscan.io/tx/${sig}` }) }] };
   } catch (e: any) { return { content: [{ type:"text" as const, text: JSON.stringify({ error: e.message }) }], isError: true }; }
 });
 
