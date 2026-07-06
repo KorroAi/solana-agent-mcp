@@ -9,8 +9,13 @@
 </p>
 
 <p align="center">
+  <img src="demo.gif" alt="Solana Agent MCP Demo" width="560">
+</p>
+
+<p align="center">
   <a href="./PAPER.md"><img src="https://img.shields.io/badge/paper-read%20now-blue.svg" alt="Read the Paper"></a>
   <a href="./DEMO.md"><img src="https://img.shields.io/badge/demo-script-green.svg" alt="Demo Script"></a>
+  <a href="./demo.mp4"><img src="https://img.shields.io/badge/demo-video%20MP4-red.svg" alt="Demo Video"></a>
 </p>
 
 **Your on-chain copilot.** An MCP (Model Context Protocol) server that gives AI agents full read/write access to the Solana blockchain — check balances, send SOL, swap tokens via Jupiter, scan pump.fun tokens in real-time, and trade memecoins. All through natural conversation. No API keys shared with the agent.
