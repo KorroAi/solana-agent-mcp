@@ -1,0 +1,26 @@
+{
+  "name": "solana-agent-mcp",
+  "version": "1.0.0",
+  "description": "MCP server that gives AI agents full Solana trading capabilities — snipe, mirror, analyze, execute",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "npx tsx src/index.ts",
+    "build": "npx tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.9.0",
+    "@pump-fun/pump-swap-sdk": "^1.17.0",
+    "@solana/web3.js": "^1.95.0",
+    "bs58": "^5.0.0",
+    "dotenv": "^16.4.0",
+    "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/ws": "^8.5.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  }
+}

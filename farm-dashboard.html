@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solana Agent V4 — Control Center</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌾</text></svg>">
+<style>
+:root{--bg:#090b10;--bg2:#0d1117;--bg3:#111820;--card:#0d1117;--border:#1a2332;--ba:#273449;--text:#e6edf3;--muted:#6e7681;--dim:#444c56;--green:#3fb950;--red:#f85149;--blue:#58a6ff;--purple:#a371f7;--gold:#d29922;--orange:#f0883e;--grad:linear-gradient(135deg,#a371f7 0%,#58a6ff 50%,#3fb950 100%)}*{box-sizing:border-box}body{font:13px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text);background:var(--bg);margin:0;padding:0;display:flex;min-height:100vh}
+*{box-sizing:border-box}body{display:flex;min-height:100vh}
+aside{width:240px;background:var(--bg2);border-right:1px solid var(--border);padding:20px 0;display:flex;flex-direction:column;flex-shrink:0}
+aside .logo{padding:0 20px;font-size:17px;font-weight:800;letter-spacing:-0.5px}
+aside .logo span{background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+aside nav{margin-top:20px;flex:1}
+aside nav a{display:flex;align-items:center;gap:10px;padding:10px 20px;color:var(--muted);text-decoration:none;font-size:12px;transition:.15s;cursor:pointer;border-right:2px solid transparent}
+aside nav a:hover{color:var(--text);background:rgba(255,255,255,0.02)}
+aside nav a.active{color:var(--purple);border-right-color:var(--purple);background:rgba(163,113,247,0.06)}
+main{flex:1;overflow-y:auto;padding:24px 32px}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.topbar h1{font-size:22px;font-weight:700;margin:0}
+.topbar .pulse{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+.topbar .pulse .dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:16px;transition:border-color .3s;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;opacity:0;transition:opacity .3s}
+.stat-card:hover{border-color:var(--ba)}
+.stat-card:hover::before{opacity:1}
+.stat-card.g::before{background:var(--green)}
+.stat-card.r::before{background:var(--red)}
+.stat-card.o::before{background:var(--gold)}
+.stat-card .lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
+.stat-card .val{font-size:20px;font-weight:700}
+.stat-card .sub{font-size:10px;color:var(--dim);margin-top:2px}
+.stat-card.g .val{color:var(--green)}.stat-card.r .val{color:var(--red)}.stat-card.o .val{color:var(--gold)}
+.panel{display:none}.panel.active{display:block}
+.table-wrap{overflow-x:auto;max-height:400px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;padding:8px 12px;color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);font-weight:600}
+td{padding:7px 12px;border-bottom:1px solid rgba(255,255,255,0.02);font-size:11px}
+tr:hover td{background:rgba(255,255,255,0.01)}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:600;letter-spacing:.3px}
+.bg{background:rgba(63,185,80,0.12);color:var(--green)}
+.br{background:rgba(248,81,73,0.12);color:var(--red)}
+.by{background:rgba(210,153,34,0.12);color:var(--gold)}
+.bb{background:rgba(88,166,255,0.12);color:var(--blue)}
+.btn{padding:6px 14px;border-radius:4px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-size:11px;font-weight:600;cursor:pointer;transition:.15s;margin-right:6px;letter-spacing:.3px}
+.btn:hover{color:var(--text);border-color:var(--ba)}
+.btn.on{background:rgba(63,185,80,0.15);border-color:var(--green);color:var(--green)}
+.btn.off{background:rgba(248,81,73,0.12);border-color:var(--red);color:var(--red)}
+.btn.warn{background:rgba(210,153,34,0.12);border-color:var(--gold);color:var(--gold)}
+input,select{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:4px;font-size:11px;width:100%}
+input:focus,select:focus{outline:none;border-color:var(--purple)}
+.setting-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px}
+.setting-row label{font-size:10px;color:var(--muted);align-self:center;letter-spacing:.4px}
+.section{margin-bottom:24px}
+.section h3{font-size:11px;font-weight:600;margin:0 0 12px;color:var(--dim);text-transform:uppercase;letter-spacing:.8px}
+canvas{width:100%;height:200px;border-radius:4px;background:var(--bg2);border:1px solid var(--border)}
+.empty{text-align:center;padding:40px;color:var(--muted);font-size:13px}
+.sbar{display:inline-block;height:5px;border-radius:3px;background:var(--border);width:80px;vertical-align:middle;margin-left:6px}
+.sbar-f{height:100%;border-radius:3px}
+</style>
+</head>
+<body>
+<aside>
+<div class="logo">⚡ <span>SOLANA</span> AGENT</div>
+<nav>
+<a class="active" href="#" onclick="sw('farm');return false" id="nav-farm">🌾 Farm</a>
+<a href="/dashboard" id="nav-autotrade" style="display:flex;align-items:center;gap:10px;padding:10px 20px;color:var(--muted);text-decoration:none;font-size:13px;transition:.15s;cursor:pointer;border-right:2px solid transparent" onmouseover="this.style.color='var(--text)';this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.color='var(--muted)';this.style.background='transparent'">📈 Solana Sniper V11</a>
+<a href="#" onclick="sw('journal');return false" id="nav-journal">📋 Journal</a>
+<a href="#" onclick="sw('portfolio');return false" id="nav-portfolio">🏦 Portfolio</a>
+<a href="#" onclick="sw('settings');return false" id="nav-settings">⚙ Settings</a>
+</nav>
+</aside>
+<main>
+<div class="topbar"><h1 id="page-title">Airdrop Farm</h1><span class="pulse"><span class="dot"></span> live</span></div>
+<!-- FARM -->
+<div class="panel active" id="panel-farm">
+<div class="stats-row" id="farm-stats"></div>
+<div class="section"><button class="btn" id="farm-btn" onclick="toggleFarm()">▶ Start</button><button class="btn warn" onclick="toggleFarmer()" id="farmer-btn" style="margin-left:8px">🔧 Farmer OFF</button><span style="margin-left:12px;font-size:11px;color:var(--muted)" id="farm-status"></span></div>
+<div class="section"><h3>Recent Harvests</h3><div class="table-wrap"><table><thead><tr><th>Source</th><th>Token</th><th>Amount</th><th>USD</th><th>Now</th></tr></thead><tbody id="farm-tbl"></tbody></table></div></div>
+<div class="section"><h3>By Protocol</h3><div class="table-wrap"><table><thead><tr><th>Protocol</th><th>USD Value</th></tr></thead><tbody id="farm-src"></tbody></table></div></div>
+</div>
+<!-- JOURNAL -->
+<div class="panel" id="panel-journal">
+<div class="stats-row" id="jnl-stats"></div>
+<div class="section"><button class="btn" onclick="downloadCSV()">📥 Download CSV</button></div>
+<div class="section"><div class="table-wrap" style="max-height:500px"><table><thead><tr><th>#</th><th>Date</th><th>Token</th><th>Entry $</th><th>Exit $</th><th>SOL In</th><th>SOL Out</th><th>PnL SOL</th><th>PnL%</th><th>Hold</th></tr></thead><tbody id="jnl-tbl"></tbody></table></div></div>
+</div>
+<!-- PORTFOLIO -->
+<div class="panel" id="panel-portfolio">
+<div class="stats-row" id="pf-stats"></div>
+<div class="section"><h3>Balance Evolution (7d)</h3><canvas id="pf-canvas"></canvas></div>
+<div class="section"><h3>Held Tokens</h3><div class="table-wrap"><table><thead><tr><th>Token</th><th>Entry $</th><th>Current $</th><th>Amount</th><th>PnL%</th><th>Hold</th></tr></thead><tbody id="pf-tbl"></tbody></table></div></div>
+</div>
+<!-- SETTINGS -->
+<div class="panel" id="panel-settings">
+<div class="section"><h3>V9 Strategy Parameters</h3>
+<div class="setting-row"><label>Buy SOL (base)</label><input type="number" id="s-buysol" step="0.01"></div>
+<div class="setting-row"><label>Buy SOL (high conviction)</label><input type="number" id="s-buysolhi" step="0.01"></div>
+<div class="setting-row"><label>Take Profit %</label><input type="number" id="s-tp" step="1"></div>
+<div class="setting-row"><label>Stop Loss %</label><input type="number" id="s-sl" step="1"></div>
+<div class="setting-row"><label>Trail Activate %</label><input type="number" id="s-trailact" step="1"></div>
+<div class="setting-row"><label>Trail Drop %</label><input type="number" id="s-traildrop" step="1"></div>
+<div class="setting-row"><label>Max Hold (seconds)</label><input type="number" id="s-maxhold" step="10"></div>
+<div class="setting-row"><label>Min Score</label><input type="number" id="s-minscore" step="1"></div>
+<button class="btn on" onclick="saveSettings()" style="margin-top:12px">💾 Save Settings</button>
+<span id="s-saved" style="margin-left:12px;font-size:11px;color:var(--green);display:none">Saved!</span>
+</div>
+<div class="section"><h3>System Status</h3><div id="sys-status"></div></div>
+</div>
+</main>
+<script>
+const B='';var tab='farm';
+function dsLink(m){return '<a href="https://pump.fun/coin/'+m+'" target="_blank" style="color:var(--blue);text-decoration:none;font-family:monospace" title="Open pump.fun">'+m.slice(0,10)+'...</a>';}async function api(p,m){var o=m||{};var r=await fetch(B+p,o);if(r.headers.get('content-type')?.includes('text/csv'))return r.text();return r.json();}
+function sw(t){tab=t;document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active')});document.querySelectorAll('nav a').forEach(function(a){if(a.id!=='nav-autotrade')a.classList.remove('active')});if(t!=='autotrade'){document.getElementById('panel-'+t).classList.add('active');document.getElementById('nav-'+t).classList.add('active');}document.getElementById('page-title').textContent={farm:'Airdrop Farm',journal:'Trade Journal',portfolio:'Portfolio',settings:'Settings'}[t]||'';refresh();}
+window.onload=function(){refresh();setInterval(refresh,5000);};
+
+function refresh(){
+if(tab==='farm')rf();
+
+else if(tab==='journal')rj();
+else if(tab==='portfolio')rp();
+else if(tab==='settings')rs();
+}
+async function rf(){
+var s=await api('/farm/status'),h=await api('/farm/harvest'),f=await api('/farmer/status');
+document.getElementById('farm-stats').innerHTML='<div class="stat-card g"><div class="lbl">Harvested</div><div class="val">'+h.totalHarvested+'</div><div class="sub">airdrops</div></div><div class="stat-card o"><div class="lbl">Total Value</div><div class="val">$'+s.totalUsdValue.toFixed(2)+'</div><div class="sub">USD</div></div><div class="stat-card"><div class="lbl">Farm</div><div class="val">'+(s.active?(s.paperMode?'📄':'🔴')+' ON':'🔴 OFF')+'</div><div class="sub">'+(s.active?(s.paperMode?'paper':'live'):'stopped')+'</div></div><div class="stat-card"><div class="lbl">Farmer</div><div class="val">'+(f.active?'🟢 ON':'🔴 OFF')+'</div><div class="sub">'+f.totalSwaps+' swaps, $'+f.totalVolume.toFixed(2)+' vol</div></div>';
+document.getElementById('farm-btn').textContent=s.active?'⏸ Stop Farm':'▶ Start Farm';
+document.getElementById('farm-btn').className='btn '+(s.active?'off':'on');
+document.getElementById('farmer-btn').textContent=f.active?'⏸ Stop Farmer ('+f.budgetUsed.toFixed(3)+'/'+f.budgetDaily+' SOL)':'🔧 Start Farmer';
+document.getElementById('farmer-btn').className='btn '+(f.active?'off':'warn');
+document.getElementById('farm-status').textContent=s.active?(s.paperMode?'Paper mode':'Live mode — real wallet'):'';
+var tbl=document.getElementById('farm-tbl');
+tbl.innerHTML=(h.log||[]).slice(0,20).map(function(f){return'<tr><td>'+f.source+'</td><td style="font-family:monospace">'+(f.mint||'').slice(0,10)+'...</td><td>'+Number(f.tokenAmount||0).toFixed(2)+'</td><td style="color:var(--green)">$'+Number(f.usdValue||0).toFixed(2)+'</td></tr>';}).join('')||'<tr><td colspan="4" class="empty">No harvests</td></tr>';
+var src=document.getElementById('farm-src');
+var ent=Object.entries(h.bySource||{});src.innerHTML=ent.length?ent.map(function(kv){return'<tr><td>'+kv[0]+'</td><td style="color:var(--green)">$'+kv[1].toFixed(2)+'</td></tr>';}).join(''):'<tr><td colspan="2" class="empty">—</td></tr>';
+}
+async function toggleFarm(){var s=await api('/farm/status');if(s.active){await fetch(B+'/farm/stop',{method:'POST'});}else{await fetch(B+'/farm/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({paper:s.paperMode})});}rf();}
+async function toggleFarmer(){var f=await api('/farmer/status');if(f.active){await fetch(B+'/farmer/stop',{method:'POST'});}else{await fetch(B+'/farmer/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({paper:false})});}rf();}
+
+async function rj(){
+var tr=await api('/trades/report');
+document.getElementById('jnl-stats').innerHTML='<div class="stat-card g"><div class="lbl">Total Trades</div><div class="val">'+tr.totalTrades+'</div><div class="sub">wins: '+tr.wins+'</div></div><div class="stat-card"><div class="lbl">Win Rate</div><div class="val">'+tr.winRate+'</div><div class="sub">streak: —</div></div><div class="stat-card o"><div class="lbl">Total PnL</div><div class="val">'+tr.totalPnlSol.toFixed(4)+' SOL</div><div class="sub">$'+tr.totalPnlUsd.toFixed(2)+'</div></div><div class="stat-card r"><div class="lbl">Best/Worst</div><div class="val">'+(tr.bestTrade?tr.bestTrade.pnlSol.toFixed(4):'0')+' / '+(tr.worstTrade?tr.worstTrade.pnlSol.toFixed(4):'0')+'</div><div class="sub">SOL</div></div>';
+var all=await api('/trades');
+document.getElementById('jnl-tbl').innerHTML=all.trades.reverse().map(function(t){return'<tr><td>'+t.id+'</td><td>'+new Date(t.ts).toLocaleDateString()+'</td><td style="font-family:monospace;font-size:10px">'+t.mint.slice(0,10)+'...</td><td>$'+t.entryPriceUsd.toFixed(6)+'</td><td>$'+t.exitPriceUsd.toFixed(6)+'</td><td>'+t.entrySol.toFixed(4)+'</td><td>'+t.solReceived.toFixed(4)+'</td><td style="color:'+(t.pnlSol>=0?'var(--green)':'var(--red)')+'">'+t.pnlSol.toFixed(6)+'</td><td style="color:'+(t.pnlPct>=0?'var(--green)':'var(--red)')+'">'+t.pnlPct.toFixed(2)+'%</td><td>'+t.holdMin.toFixed(1)+'m</td></tr>';}).join('')||'<tr><td colspan="10" class="empty">No trades yet</td></tr>';
+}
+async function downloadCSV(){var csv=await api('/trades/export');var b=new Blob([csv],{type:'text/csv'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='trades_'+new Date().toISOString().slice(0,10)+'.csv';a.click();}
+
+async function rp(){
+var p=await api('/portfolio');
+document.getElementById('pf-stats').innerHTML='<div class="stat-card g"><div class="lbl">SOL Balance</div><div class="val">'+p.solBalance.toFixed(4)+'</div><div class="sub">$'+p.solUsd.toFixed(2)+'</div></div><div class="stat-card o"><div class="lbl">Total Value</div><div class="val">'+p.totalValueSol.toFixed(4)+' SOL</div><div class="sub">incl. positions</div></div><div class="stat-card"><div class="lbl">Total PnL</div><div class="val" style="color:'+(p.tradeStats.totalPnlSol>=0?'var(--green)':'var(--red)')+'">'+p.tradeStats.totalPnlSol.toFixed(4)+' SOL</div><div class="sub">$'+p.tradeStats.totalPnlUsd.toFixed(2)+'</div></div><div class="stat-card"><div class="lbl">Win Rate</div><div class="val">'+p.tradeStats.winRate+'%</div><div class="sub">'+p.tradeStats.wins+'W / '+(p.tradeStats.totalTrades-p.tradeStats.wins)+'L</div></div>';
+document.getElementById('pf-tbl').innerHTML=(p.activePositions||[]).map(function(x){return'<tr><td style="font-family:monospace">'+x.mint.slice(0,10)+'...</td><td>$'+x.entryUsd.toFixed(6)+'</td><td>$'+(x.currentUsd||0).toFixed(6)+'</td><td>'+x.tokenAmount.toFixed(2)+'</td><td style="color:'+(x.pnlPct>=0?'var(--green)':'var(--red)')+'">'+x.pnlPct.toFixed(2)+'%</td><td>'+x.holdMin.toFixed(1)+'m</td></tr>';}).join('')||'<tr><td colspan="6" class="empty">No held tokens</td></tr>';
+var snaps=p.snapshots||[];if(snaps.length>1)drawChart(snaps);
+}
+function drawChart(snaps){var c=document.getElementById('pf-canvas');var ctx=c.getContext('2d');var W=c.parentElement.clientWidth;c.width=W;c.height=200;var H=200;var pad=40;var w=W-pad*2;var h=H-pad-10;var vals=snaps.map(function(s){return s.usdValue;});var min=Math.min.apply(null,vals)*0.98;var max=Math.max.apply(null,vals)*1.02;if(max===min){max=min+1;}ctx.clearRect(0,0,W,H);ctx.strokeStyle='var(--border)';ctx.lineWidth=1;var n=Math.min(6,vals.length);for(var i=0;i<=n;i++){var y=pad+(h/n)*i;ctx.beginPath();ctx.moveTo(pad,y);ctx.lineTo(W-pad,y);ctx.stroke();}ctx.strokeStyle='var(--green)';ctx.lineWidth=2;ctx.beginPath();for(var i=0;i<vals.length;i++){var x=pad+(w/(vals.length-1))*i;var y=pad+h-((vals[i]-min)/(max-min))*h;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.stroke();}
+
+async function rs(){
+var s=await api('/settings');
+document.getElementById('s-buysol').value=s.buySizes.standard;
+document.getElementById('s-buysolhi').value=s.buySizes.standardHigh;
+document.getElementById('s-tp').value=s.tpTiers[0].pct;
+document.getElementById('s-sl').value=s.slStandard;
+document.getElementById('s-trailact').value=s.trailActivate;
+document.getElementById('s-traildrop').value=s.trailDrop;
+document.getElementById('s-maxhold').value=s.maxHold;
+document.getElementById('s-minscore').value=s.minScore;
+document.getElementById('sys-status').innerHTML='<div class="stats-row">'+
+
+'<div class="stat-card"><div class="lbl">Farm</div><div class="val" style="font-size:16px">'+(s.farmOn?'🟢 ON':'🔴 OFF')+'</div></div>'+
+'<div class="stat-card"><div class="lbl">Farmer</div><div class="val" style="font-size:16px">'+(s.farmerOn?'🟢 ON':'🔴 OFF')+'</div></div>'+
+'<div class="stat-card"><div class="lbl">TP/SL</div><div class="val" style="font-size:16px">'+(s.tpslActive?'✅ ON':'❌ OFF')+'</div></div></div>';
+}
+async function saveSettings(){
+var b={buySol:Number(document.getElementById('s-buysol').value),buySolHigh:Number(document.getElementById('s-buysolhi').value),tp:Number(document.getElementById('s-tp').value),sl:Number(document.getElementById('s-sl').value),trailActivate:Number(document.getElementById('s-trailact').value),trailDrop:Number(document.getElementById('s-traildrop').value),maxHold:Number(document.getElementById('s-maxhold').value),minScore:Number(document.getElementById('s-minscore').value)};
+await fetch(B+'/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
+var e=document.getElementById('s-saved');e.style.display='inline';setTimeout(function(){e.style.display='none';},2000);
+}
+</script>
+</body>
+</html>
