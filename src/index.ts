@@ -506,97 +506,117 @@ const server = http.createServer(async (req, res) => {
   } catch (e: any) { if (!res.headersSent) json(res, { error: e.message }, 500); }
 });
 
-// MCP stdio server — AI agents connect natively via stdin/stdout (no API key needed)
+// ── Generic Solana helpers (not pump.fun specific) ──
+async function getSolBalance(address: string): Promise<number | null> {
+  try {
+    const d = await sysPostJSON(getRPC(), { jsonrpc:"2.0", id:1, method:"getBalance", params:[address] }, 5000);
+    return d?.result?.value !== undefined ? d.result.value / 1e9 : null;
+  } catch { return null; }
+}
+async function getTokenBalance(address: string, mint: string): Promise<number | null> {
+  try {
+    const d = await sysPostJSON(getRPC(), { jsonrpc:"2.0", id:1, method:"getTokenAccountsByOwner", params:[address, {mint}, {encoding:"jsonParsed"}] }, 5000);
+    if (!d?.result?.value?.length) return 0;
+    const info = d.result.value[0]?.account?.data?.parsed?.info;
+    return info ? Number(info.tokenAmount.amount) / 10 ** info.tokenAmount.decimals : null;
+  } catch { return null; }
+}
+async function getTokenMetadata(mint: string): Promise<any> {
+  try {
+    const d = await sysPostJSON(getRPC(), { jsonrpc:"2.0", id:1, method:"getAccountInfo", params:[mint, {encoding:"jsonParsed"}] }, 5000);
+    const info = d?.result?.value?.data?.parsed?.info;
+    if (!info) return null;
+    return { mint, decimals: info.decimals, supply: Number(info.supply) / 10**info.decimals, mintAuthority: info.mintAuthority || null, freezeAuthority: info.freezeAuthority || null };
+  } catch { return null; }
+}
+async function getTxDetails(signature: string): Promise<any> {
+  try {
+    const d = await sysPostJSON(getRPC(), { jsonrpc:"2.0", id:1, method:"getTransaction", params:[signature, {encoding:"jsonParsed", maxSupportedTransactionVersion:0}] }, 5000);
+    if (!d?.result) return null;
+    const tx = d.result;
+    return { signature, slot: tx.slot, blockTime: tx.blockTime, status: tx.meta?.status, fee: tx.meta?.fee / 1e9, signer: tx.transaction?.message?.accountKeys?.[0]?.pubkey };
+  } catch { return null; }
+}
+
+// ── MCP stdio server — AI agents connect natively via stdin/stdout (no API key needed) ──
 const mcpServer = new McpServer(
   { name: "solana-agent-mcp", version: "10.0.0" },
   { capabilities: { tools: {}, resources: {} } }
 );
 
-// Resources — read-only data an agent can pull
-mcpServer.resource("solana://health", "solana://health", async () => ({
-  contents: [{
-    uri: "solana://health", mimeType: "application/json",
-    text: JSON.stringify({
-      mode: "V10-MCP", positions: [...pos.values()].filter(x => !x.sold).length,
-      scannerAlive: scanWs?.readyState === WebSocket.OPEN, trades: tradeHistory.length,
-      paperBal, autoTradeOn, dailyPnl: +dailyPnl.toFixed(4), solPrice: getSolPriceSafe()
-    })
-  }]
+mcpServer.tool("solana_get_balance", "Get SOL balance for any Solana wallet address", {}, async (args: any) => {
+  const address = (args?.address || "").trim();
+  if (!address) return { content: [{ type:"text" as const, text: JSON.stringify({ error:"Provide 'address' parameter" }) }], isError: true };
+  const bal = await getSolBalance(address);
+  return { content: [{ type:"text" as const, text: JSON.stringify({ address, balanceSOL: bal, balanceLamports: bal !== null ? Math.floor(bal * 1e9) : null }) }] };
+});
+
+mcpServer.tool("solana_get_token_balance", "Get SPL token balance for a wallet address and token mint", {}, async (args: any) => {
+  const address = (args?.address || "").trim();
+  const mint = (args?.mint || "").trim();
+  if (!address || !mint) return { content: [{ type:"text" as const, text: JSON.stringify({ error:"Provide 'address' and 'mint' parameters" }) }], isError: true };
+  const bal = await getTokenBalance(address, mint);
+  return { content: [{ type:"text" as const, text: JSON.stringify({ address, mint, balance: bal }) }] };
+});
+
+mcpServer.tool("solana_get_token_info", "Get on-chain metadata for any SPL token: decimals, supply, authorities", {}, async (args: any) => {
+  const mint = (args?.mint || "").trim();
+  if (!mint) return { content: [{ type:"text" as const, text: JSON.stringify({ error:"Provide 'mint' parameter" }) }], isError: true };
+  const info = await getTokenMetadata(mint);
+  if (!info) return { content: [{ type:"text" as const, text: JSON.stringify({ error:"Token not found or invalid mint address" }) }], isError: true };
+  return { content: [{ type:"text" as const, text: JSON.stringify({ ...info, mintRevoked: info.mintAuthority === null, freezeRevoked: info.freezeAuthority === null }) }] };
+});
+
+mcpServer.tool("solana_get_price", "Get current SOL price in USD", {}, async () => ({
+  content: [{ type:"text" as const, text: JSON.stringify({ SOL: getSolPriceSafe(), timestamp: Date.now() }) }]
+}));
+
+mcpServer.tool("solana_scan_tokens", "Scan recent pump.fun tokens from real-time Helius WebSocket", {}, async () => {
+  const tokens = latest.slice(0, 20).map(t => ({ mint: t.mint, ageSec: ((Date.now() - t.ts) / 1000).toFixed(1) }));
+  return { content: [{ type:"text" as const, text: JSON.stringify({ scannerAlive: scanWs?.readyState === WebSocket.OPEN, count: tokens.length, tokens }) }] };
+});
+
+mcpServer.tool("solana_get_transaction", "Get transaction details by signature", {}, async (args: any) => {
+  const sig = (args?.signature || "").trim();
+  if (!sig) return { content: [{ type:"text" as const, text: JSON.stringify({ error:"Provide 'signature' parameter" }) }], isError: true };
+  const tx = await getTxDetails(sig);
+  if (!tx) return { content: [{ type:"text" as const, text: JSON.stringify({ error:"Transaction not found" }) }], isError: true };
+  return { content: [{ type:"text" as const, text: JSON.stringify(tx) }] };
+});
+
+mcpServer.tool("solana_request_airdrop", "Request SOL airdrop on devnet (testnet only, not mainnet)", {}, async (args: any) => {
+  const address = (args?.address || "").trim();
+  const amount = Number(args?.amount) || 1;
+  if (!address) return { content: [{ type:"text" as const, text: JSON.stringify({ error:"Provide 'address' parameter" }) }], isError: true };
+  try {
+    const d = await sysPostJSON("https://api.devnet.solana.com", { jsonrpc:"2.0", id:1, method:"requestAirdrop", params:[address, Math.floor(amount * 1e9)] }, 15000);
+    return { content: [{ type:"text" as const, text: JSON.stringify({ address, amountSOL: amount, signature: d?.result || null, network: "devnet" }) }] };
+  } catch { return { content: [{ type:"text" as const, text: JSON.stringify({ error:"Airdrop failed — devnet may be throttled" }) }], isError: true }; }
+});
+
+mcpServer.tool("solana_health", "System health: RPC status, scanner status, SOL price", {}, async () => ({
+  content: [{ type:"text" as const, text: JSON.stringify({
+    rpcHealthy: rpcConsecutiveFails < 3,
+    rpcBackoffCount: rpcBackoff.size,
+    scannerAlive: scanWs?.readyState === WebSocket.OPEN,
+    scannerTokensTracked: pfAct.size,
+    solPrice: getSolPriceSafe(),
+  }) }]
+}));
+
+// Resources — read-only data an agent can subscribe to
+mcpServer.resource("solana://price", "solana://price", async () => ({
+  contents: [{ uri:"solana://price", mimeType:"application/json", text: JSON.stringify({ SOL: getSolPriceSafe(), ts: Date.now() }) }]
 }));
 
 mcpServer.resource("solana://tokens/recent", "solana://tokens/recent", async () => ({
-  contents: [{
-    uri: "solana://tokens/recent", mimeType: "application/json",
-    text: JSON.stringify(latest.slice(0, 20))
-  }]
-}));
-
-mcpServer.resource("solana://portfolio/active", "solana://portfolio/active", async () => {
-  const active = [...pos.values()].filter(x => !x.sold);
-  const prices = Object.fromEntries((await Promise.all(active.map(async x => [x.mint, await getPriceUsd(x.mint)] as const))).filter(([, pr]) => pr !== null));
-  return { contents: [{ uri: "solana://portfolio/active", mimeType: "application/json", text: JSON.stringify(active.map(x => { const r = getPnL(x, prices[x.mint] || 0); return { mint: x.mint, entrySol: x.entrySol, entryUsd: x.entryPriceUsd, pnlPct: r.pnlPct, pnlSol: r.pnlSol, holdSec: (Date.now() - x.ts) / 1000 }; })) }] };
-});
-
-// Tools — actions an agent can invoke
-mcpServer.tool("solana_scan", "Get recent pump.fun tokens detected by the real-time scanner", {}, async () => {
-  const tokens = latest.slice(0, 20).map(t => ({ mint: t.mint, ageSec: ((Date.now() - t.ts) / 1000).toFixed(1), ts: t.ts }));
-  return { content: [{ type: "text" as const, text: JSON.stringify({ count: tokens.length, tokens }) }] };
-});
-
-mcpServer.tool("solana_health", "Full system health: scanner, positions, PnL, RPC status", {}, async () => ({
-  content: [{ type: "text" as const, text: JSON.stringify({
-    mode: "V10-MCP", scannerAlive: scanWs?.readyState === WebSocket.OPEN, scannerMsgs: scanMsgs,
-    scannerLag: ((Date.now() - lastScanTs) / 1000).toFixed(1), activePositions: [...pos.values()].filter(x => !x.sold).length,
-    paperBal, paperOn, autoTradeOn, trades: tradeHistory.length, dailyPnl: +dailyPnl.toFixed(4),
-    wins, losses, solPrice: getSolPriceSafe(), rpcBackoffCount: rpcBackoff.size
-  }) }]
-}));
-
-mcpServer.tool("solana_portfolio", "Get active positions with live PnL", {}, async () => {
-  const active = [...pos.values()].filter(x => !x.sold);
-  if (!active.length) return { content: [{ type: "text" as const, text: JSON.stringify({ activePositions: [], paperBal, message: "No open positions" }) }] };
-  const prices = Object.fromEntries((await Promise.all(active.map(async x => [x.mint, await getPriceUsd(x.mint)] as const))).filter(([, pr]) => pr !== null));
-  const positions = active.map(x => { const r = getPnL(x, prices[x.mint] || 0); return { mint: x.mint, entrySol: x.entrySol, pnlPct: r.pnlPct.toFixed(1)+"%", pnlSol: +r.pnlSol.toFixed(6), holdMin: ((Date.now()-x.ts)/60000).toFixed(1), entryPriceUsd: x.entryPriceUsd }; });
-  return { content: [{ type: "text" as const, text: JSON.stringify({ activePositions: positions, paperBal, totalPnLSol: +positions.reduce((s,p) => s + p.pnlSol, 0).toFixed(6) }) }] };
-});
-
-mcpServer.tool("solana_trades", "Get trade history with PnL breakdown", {}, async () => ({
-  content: [{ type: "text" as const, text: JSON.stringify({
-    total: tradeHistory.length, wins, losses, dailyPnl: +dailyPnl.toFixed(4),
-    recent: tradeHistory.slice(0, 10).map(t => ({ mint: t.mint, pnlPct: t.pnlPct.toFixed(1)+"%", pnlSol: t.pnlSol.toFixed(6), reason: t.reason, holdSec: t.holdSec.toFixed(0) }))
-  }) }]
-}));
-
-mcpServer.tool("solana_stats", "Win rate, best/worst trades, PnL summary", {}, async () => ({
-  content: [{ type: "text" as const, text: JSON.stringify({
-    totalTrades: tradeHistory.length, wins, losses,
-    winRate: tradeHistory.length ? ((wins/tradeHistory.length)*100).toFixed(0)+"%" : "N/A",
-    bestPnlSol: +best.toFixed(6), worstPnlSol: +worst.toFixed(6),
-    dailyPnl: +dailyPnl.toFixed(4), cbLosses, paperBal
-  }) }]
-}));
-
-mcpServer.tool("solana_autotrade_start", "Start automated paper trading with momentum-based signals", {}, async () => ({
-  content: [{ type: "text" as const, text: JSON.stringify({ status: startAutoTrade(), autoTradeOn }) }]
-}));
-
-mcpServer.tool("solana_autotrade_stop", "Stop automated paper trading immediately", {}, async () => ({
-  content: [{ type: "text" as const, text: JSON.stringify({ status: stopAutoTrade(), autoTradeOn }) }]
-}));
-
-mcpServer.tool("solana_settings", "Current trading configuration and parameters", {}, async () => ({
-  content: [{ type: "text" as const, text: JSON.stringify({
-    mode: "V10", SL, TP1, TP2, TRAIL, MAX_HOLD, MAX_POS,
-    BUY_EARLY, BUY_CONFIRMED, MOM_EARLY_BUYS, MOM_CONF_BUYS,
-    minEntryPrice: MIN_ENTRY_PRICE_USD, solPrice: getSolPriceSafe(), autoTradeOn
-  }) }]
+  contents: [{ uri:"solana://tokens/recent", mimeType:"application/json", text: JSON.stringify(latest.slice(0, 20)) }]
 }));
 
 // Start MCP stdio transport (no API key — agents connect via local process stdio)
 async function startMcp() {
   const transport = new StdioServerTransport();
   await mcpServer.connect(transport);
-  // stderr is safe — stdio transport uses stdout for MCP protocol
   process.stderr.write(`[mcp] solana-agent-mcp v10 ready on stdio\n`);
 }
 startMcp().catch(e => process.stderr.write(`[mcp] stdio transport failed: ${e.message}\n`));
