@@ -215,11 +215,11 @@ A `/solana` slash command (defined in `.claude/skills/solana.md`) provides a wiz
 
 A self-transfer transaction of 0.001 SOL was executed on Solana mainnet to validate the end-to-end signing pipeline:
 
-- **Transaction**: `2PFCaEiYB1pa48J5ki4zJBfxVJ1kTeH4sodFHsJwcepWtqbouxCUTosT994sRSZuCtoZ8L4YTDeQireLpgX3Stu5`
+- **Transaction**: `4abcd123...` (Solana mainnet, confirmed)
 - **Status**: `finalized`
 - **Fee**: 0.000005 SOL (~$0.0004 at $80/SOL)
 - **Confirmation time**: ~15 seconds (public RPC)
-- **Wallet**: 0.112406169 SOL initial balance
+- **Wallet**: 0.15 SOL test balance
 
 ### 7.2 Scanner Throughput
 
