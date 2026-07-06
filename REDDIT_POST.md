@@ -1,105 +1,147 @@
-# 🚀 I built an MCP server that lets AI agents control Solana — check balances, send SOL, swap tokens, trade memecoins. Zero API keys. 100% local.
+# 🚀 I built an MCP server that lets AI agents control Solana — zero API keys, 100% local
 
-**GitHub:** https://github.com/KorroAi/solana-agent-mcp
+**GitHub →** https://github.com/KorroAi/solana-agent-mcp
 
 ---
 
 ## What is this?
 
-It's an MCP (Model Context Protocol) server that gives Claude, Cursor, and any MCP-compatible AI agent full read/write access to the Solana blockchain. The agent talks to Solana through natural language. Your private key signs transactions locally. It never leaves your machine.
+An MCP server that gives any AI agent (Claude, Cursor, etc.) full read/write access to the Solana blockchain through natural language.
 
-**No API keys are shared with the agent.** The server runs as a child process. Communication happens over stdin/stdout — not the network.
+Your private key signs transactions locally. It never touches the network. The agent never sees it. Communication happens over stdin/stdout — not HTTP, not WebSocket, not some third-party API.
+
+**No API keys are shared with the agent. Ever.**
+
+---
 
 ## Demo
 
 ![Demo](https://raw.githubusercontent.com/KorroAi/solana-agent-mcp/main/demo.gif)
 
-*45-second terminal session. Agent checks balance, scans pump.fun, looks up USDC metadata, sends a transaction. All confirmed on-chain.*
+*Terminal session — agent checks balance, scans pump.fun, looks up USDC metadata, sends a live transaction. All on-chain.*
 
-## What the agent can do (14 tools)
+---
 
-### Read
-| Action | Natural language |
-|--------|-----------------|
-| SOL balance | "check my balance" |
-| Token balance | "how much USDC do I have?" |
-| Token info | "what's the supply of this token?" |
-| SOL price | "what's SOL at?" |
-| Live scanner | "scan pump.fun tokens" |
-| Transaction lookup | "check tx 4abc..." |
+## What the agent can do
 
-### Write (with wallet)
-| Action | Natural language |
-|--------|-----------------|
-| Send SOL | "send 0.01 SOL to 7nXb..." |
-| Send tokens | "send 100 USDC to..." |
-| Jupiter swap | "swap 0.05 SOL to USDC" |
-| Buy memecoin | "buy B1bN... for 0.02 SOL" |
-| Sell memecoin | "sell B1bN..." |
-| Devnet airdrop | "airdrop me some test SOL" |
+**Read — no wallet needed**
+
+- "check my balance" — SOL balance for any address
+- "how much USDC do I have?" — SPL token balances
+- "what's this token?" — decimals, supply, mint authority
+- "SOL price?" — live USD price
+- "scan pump.fun" — real-time token discovery
+- "check this transaction" — lookup by signature
+
+**Write — needs your Phantom key in .env**
+
+- "send 0.01 SOL to Alice" — sends real SOL, returns tx signature
+- "send 100 USDC to Bob" — SPL token transfers
+- "swap 0.05 SOL to USDC" — Jupiter aggregator, best route
+- "buy this memecoin for 0.02 SOL" — pump.fun buys
+- "sell this memecoin" — pump.fun sells
+- "airdrop me test SOL" — devnet faucet
+
+14 tools total. 8 read. 6 write.
+
+---
 
 ## How it works
 
 ```
-You: "send 0.01 SOL to Alice"
-     │
-     ▼
-Claude Code ←→ MCP stdio (local) ←→ solana-agent-mcp ←→ Solana
-                                        (your Phantom key)
+You type: "send 0.01 SOL to Alice"
+          │
+          ▼
+Your AI agent ──→ MCP stdio (local pipe) ──→ solana-agent-mcp ──→ Solana blockchain
+                                                  │
+                                          Your Phantom key
+                                          (stays in .env)
 ```
 
-The private key stays in a `.env` file on your machine. The MCP server reads it, signs transactions locally, and returns the tx signature. The AI agent never sees your key, your RPC API key, or anything sensitive.
+1. Your AI agent spawns the server as a child process
+2. They talk over stdin/stdout — local, binary, no network
+3. The server reads your private key from `.env`
+4. It builds the transaction, signs it, sends it to Solana
+5. It returns the tx signature + Solscan link to the agent
+6. You see "✅ Sent! 4abc123... finalized"
+
+The agent never touches your key. Your RPC API keys. Nothing.
+
+---
 
 ## Why this matters
 
-Current AI agents that interact with blockchains require you to paste your private key into a web app, share it with a third-party service, or configure API keys across multiple tools. Each step multiplies the attack surface.
+Every existing crypto AI tool asks you to paste your private key somewhere. Into a web app. Into a Telegram bot. Into a browser extension. Every single one expands your attack surface.
 
-MCP flips this. The agent runs locally. The keys run locally. The communication is local. You get the full power of an AI agent without trusting anyone with your credentials.
+MCP inverts this.
 
-## Tech stack
+The agent runs locally.  
+The keys stay local.  
+The signing is local.  
+The communication never leaves your machine.
 
-- **MCP SDK 1.29** (stdio transport)
-- **@solana/web3.js 1.95** (transactions, RPC)
-- **@solana/spl-token** (token transfers)
-- **Helius WebSocket** (real-time pump.fun scanner)
-- **Jupiter API v6** (swap routing)
-- **Zod** (tool argument validation)
-- **TypeScript** (single 680-line file)
+You get full AI-powered blockchain interaction without trusting anyone.
 
-## Real transaction confirmed
+---
 
-I tested a live self-transfer on mainnet:
-- **Status:** finalized
-- **Fee:** 0.000005 SOL
-- **Confirmation:** ~15 seconds
+## Real transaction proof
 
-The transaction signing pipeline works end-to-end.
+I tested a live self-transfer on Solana mainnet:
+
+→ **0.001 SOL sent**  
+→ **Status: finalized**  
+→ **Fee: 0.000005 SOL** (~$0.0004)  
+→ **Confirmation: ~15 seconds**
+
+The signing pipeline works. End to end. On mainnet.
+
+---
+
+## Tech
+
+TypeScript. Single file. 680 lines.
+
+- MCP SDK 1.29 — stdio transport
+- @solana/web3.js 1.95 — transactions, RPC
+- @solana/spl-token — token transfers
+- Helius WebSocket — real-time pump.fun scanner (3.5M+ msgs)
+- Jupiter API v6 — best-price swap routing
+- Zod — tool argument validation
+- Circuit breaker + retry — RPC resilience
+
+---
 
 ## License
 
-**AGPL-3.0** — strong copyleft. If a company modifies this code and runs it as a service, they MUST release their changes. Individuals can use, modify, and distribute freely.
+**AGPL-3.0**
 
-## Get started
+If a company modifies this code and runs it as a service, they MUST release their changes. Individuals can use, modify, and distribute freely.
+
+Nobody gets to take this, close the source, and sell it.
+
+---
+
+## Start in 30 seconds
 
 ```bash
 git clone https://github.com/KorroAi/solana-agent-mcp
 cd solana-agent-mcp
 npm install
 cp .env.example .env
-# Add your Helius API key + Phantom private key
+# add your Helius keys + Phantom private key
 npm run dev
 ```
 
-Then type `/solana` in Claude Code. The wizard guides you.
+Type `/solana` in Claude Code. The wizard handles setup.
 
 ---
 
-**GitHub:** https://github.com/KorroAi/solana-agent-mcp
+**⭐ GitHub:** https://github.com/KorroAi/solana-agent-mcp
 
-**Paper:** [PAPER.md](https://github.com/KorroAi/solana-agent-mcp/blob/main/PAPER.md) — full academic paper (10 sections, architecture deep-dive)
+**📄 Paper:** 10-section academic paper in the repo — architecture deep-dive, security model, scanner design, empirical results
 
-AMA in the comments. Happy to answer questions about MCP, Solana integration, or the security model.
+**💬 AMA** in the comments — MCP, Solana integration, security model, whatever
 
 ---
 
-*Cross-posted to r/solana, r/cryptocurrency, r/defi, r/artificial, r/mcp*
+r/solana · r/cryptocurrency · r/defi · r/artificial · r/mcp
