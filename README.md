@@ -30,26 +30,47 @@ Agents connect via the standard MCP protocol over stdin/stdout. **No API key, no
 }
 ```
 
-### Available MCP Tools
+### Available MCP Tools (17 total)
 
+**Market Data**
 | Tool | Description |
 |------|-------------|
 | `solana_scan` | Recent pump.fun tokens from real-time scanner |
-| `solana_health` | System health: scanner, positions, PnL, RPC |
+| `solana_token_info` | Deep analysis: bonding curve, safety, momentum, whales, price |
+| `solana_bonding_curve` | Bonding curve state: virtual reserves, graduation %, remaining SOL |
+| `solana_momentum` | Buy/sell momentum breakdown across 5s/10s/30s windows |
+| `solana_signals` | Latest trading signal evaluations with scores and reasons |
+| `solana_scanner` | Scanner status: throughput, tracked tokens, connection health |
+
+**Portfolio & Trading**
+| Tool | Description |
+|------|-------------|
 | `solana_portfolio` | Active positions with live PnL |
 | `solana_trades` | Trade history with PnL breakdown |
 | `solana_stats` | Win rate, best/worst trades, daily PnL |
+| `solana_losers` | Blacklisted mints (never re-buy after loss) |
+
+**System & Control**
+| Tool | Description |
+|------|-------------|
+| `solana_health` | System health: scanner, positions, PnL, RPC |
+| `solana_rpc_status` | RPC circuit breaker state, backoff URLs |
+| `solana_settings` | Current trading config and parameters |
+| `solana_paper_mode` | Toggle paper mode on/off, reset balance |
 | `solana_autotrade_start` | Start automated paper trading |
 | `solana_autotrade_stop` | Stop automated paper trading |
-| `solana_settings` | Current trading config and parameters |
 
-### Available MCP Resources
+### Available MCP Resources (6 total)
 
 | Resource URI | Content |
 |-------------|---------|
 | `solana://health` | System health snapshot |
 | `solana://tokens/recent` | Last 20 tokens detected by scanner |
 | `solana://portfolio/active` | Active positions with live prices |
+| `solana://trades/history` | Full trade history with PnL |
+| `solana://signals/latest` | Latest signal evaluations |
+| `solana://dashboard` | Aggregated dashboard: scanner, trading, performance |
+| `solana://scanner/top` | Top 10 most active tokens by scan hits |
 
 ## Quick Start
 
