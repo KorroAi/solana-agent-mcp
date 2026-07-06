@@ -52,13 +52,15 @@ const PORT = parseInt(process.env.SOLANA_MCP_PORT || "8791", 10);
 const rpcBackoff = new Map<string, number>();
 const RPC_BACKOFF_BASE = 5000;
 function markRpcFailed(url: string) { rpcBackoff.set(url, Date.now() + RPC_BACKOFF_BASE * (rpcBackoff.has(url) ? 2 : 1)); }
+const PUBLIC_RPC = "https://api.mainnet-beta.solana.com";
 function getRPC() {
+  // Always try non-backoff URLs first, but guarantee public RPC as fallback
   for (let i = 0; i < RPC_URLS.length; i++) {
-    const u = RPC_URLS[rpcIdx++ % RPC_URLS.length] || "https://api.mainnet-beta.solana.com";
+    const u = RPC_URLS[rpcIdx++ % RPC_URLS.length] || PUBLIC_RPC;
     const backoff = rpcBackoff.get(u) || 0;
     if (Date.now() >= backoff) return u;
   }
-  return RPC_URLS[rpcIdx++ % RPC_URLS.length] || "https://api.mainnet-beta.solana.com";
+  return PUBLIC_RPC; // guaranteed — public RPC never gets marked as failed
 }
 let rpcConsecutiveFails = 0;
 function onRpcSuccess() { rpcConsecutiveFails = 0; }
@@ -102,10 +104,10 @@ function json(res: http.ServerResponse, d: any, code = 200) { res.writeHead(code
 function sf(res: http.ServerResponse, f: string, ct: string) { try { res.writeHead(200, { "Content-Type": ct }); res.end(fs.readFileSync(path.resolve(process.cwd(), f), "utf-8")); } catch { json(res, { error: "not found" }, 404); } }
 
 // System DNS HTTP helpers with retry + backoff (bypasses Node.js c-ares DNS issues)
-function sysGetJSON(url: string, timeout = 5000, retries = 2): Promise<any> {
+function sysGetJSON(url: string, timeout = 5000, retries = 3): Promise<any> {
   return sysRequestJSON("GET", url, null, timeout, retries);
 }
-function sysPostJSON(url: string, body: any, timeout = 5000, retries = 2): Promise<any> {
+function sysPostJSON(url: string, body: any, timeout = 5000, retries = 3): Promise<any> {
   return sysRequestJSON("POST", url, body, timeout, retries);
 }
 function sysRequestJSON(method: "GET" | "POST", url: string, body: any, timeout: number, retries: number): Promise<any> {
@@ -553,10 +555,11 @@ async function getTokenBalance(address: string, mint: string): Promise<number | 
 }
 async function getTokenMetadata(mint: string): Promise<any> {
   try {
-    const d = await sysPostJSON(getRPC(), { jsonrpc:"2.0", id:1, method:"getAccountInfo", params:[mint, {encoding:"jsonParsed"}] }, 5000);
-    const info = d?.result?.value?.data?.parsed?.info;
-    if (!info) return null;
-    return { mint, decimals: info.decimals, supply: Number(info.supply) / 10**info.decimals, mintAuthority: info.mintAuthority || null, freezeAuthority: info.freezeAuthority || null };
+    const conn = new Connection(PUBLIC_RPC, "confirmed");
+    const info = await conn.getParsedAccountInfo(new PublicKey(mint));
+    const data = (info?.value?.data as any)?.parsed?.info;
+    if (!data) return null;
+    return { mint, decimals: data.decimals, supply: Number(data.supply) / 10**data.decimals, mintAuthority: data.mintAuthority || null, freezeAuthority: data.freezeAuthority || null };
   } catch { return null; }
 }
 async function getTxDetails(signature: string): Promise<any> {
