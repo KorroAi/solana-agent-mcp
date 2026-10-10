@@ -123,9 +123,11 @@ This is strong copyleft. You can use, modify, and distribute this software freel
 
 See [LICENSE](./LICENSE) for the full text.
 
+*AGPL-3.0 — Free as in freedom. Share your improvements.*
+
 ---
 
 <p align="center">
-  <b>Built by <a href="https://github.com/KorroAi">KORROCORP</a></b><br>
-  <sub>AGPL-3.0 — Free as in freedom. Share your improvements.</sub>
+  <b>Built by <a href="https://korrocorp.com">Korrocorp</a></b> — games, apps and AI tools.<br>
+  <a href="https://korrocorp.com">korrocorp.com</a> · <a href="https://x.com/korrocorp">X @korrocorp</a> · <a href="https://discord.gg/RSBHHjxnYt">Discord</a> · <a href="https://github.com/KorroAi">GitHub</a>
 </p>
